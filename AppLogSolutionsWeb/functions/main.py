@@ -4635,53 +4635,19 @@ def core_genera_completo_giornata(data_consegna, tenant="DNR"):
     }
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.MB_256, timeout_sec=60,
-    cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
+    cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]),
+    invoker="public")
 def risolvi_tenant_consegna(req: https_fn.CallableRequest):
     """
     Risolve il tenant logistico in base al codice consegna cercando
     dinamicamente su tutte le anagrafiche.
-    Ritorna:
-      - {"status": "ok", "tenant": "NOME"} (se univoco)
-      - {"status": "error", "message": "CODICE_NON_TROVATO"}
-      - {"status": "error", "message": "CODICE_AMBIGUO"}
     """
-    codice = str(req.data.get("codice_consegna", "")).strip().lower()
-    if not codice:
-        return {"status": "error", "message": "CODICE_NON_TROVATO"}
-        
+    from services.tenant_service import handle_risolvi_tenant_consegna
+
+    codice = str(req.data.get("codice_consegna", "")).strip() if req.data else ""
     db = get_db()
-    tenants_list = [doc.id for doc in db.collection('clienti').list_documents()]
     
-    matches = []
-    
-    for t in tenants_list:
-        coll_ref = db.collection('clienti').document(t).collection('raccolta clienti')
-        # Prova lookup diretto su ID document
-        doc_snap = coll_ref.document(codice).get()
-        if doc_snap.exists:
-            matches.append(t)
-            continue
-            
-        # Ricerca per codice frutta
-        frutta_snap = coll_ref.where('codice_frutta', '==', codice).limit(1).get()
-        if len(frutta_snap) > 0:
-            matches.append(t)
-            continue
-            
-        # Ricerca per codice latte
-        latte_snap = coll_ref.where('codice_latte', '==', codice).limit(1).get()
-        if len(latte_snap) > 0:
-            matches.append(t)
-            continue
-            
-    matches = list(set(matches))
-    
-    if len(matches) == 0:
-        return {"status": "error", "message": "CODICE_NON_TROVATO"}
-    elif len(matches) == 1:
-        return {"status": "ok", "tenant": matches[0]}
-    else:
-        return {"status": "error", "message": "CODICE_AMBIGUO"}
+    return handle_risolvi_tenant_consegna(codice, db)
 
 # --- ENDPOINTS HTTP ---
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=540,
