@@ -4640,6 +4640,12 @@ def riepilogo_fatturazione(req: https_fn.CallableRequest):
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def pulisci_cartelle_elaborazione(req: https_fn.CallableRequest):
     """Pulisce le cartelle di storage e i job Firestore per la giornata selezionata prima di caricare i nuovi file."""
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
+
     try:
         data_consegna = req.data.get("data_consegna")
         tipologie = req.data.get("tipologie", ["FRUTTA", "LATTE", "GRAND_CHEF", "DAC"])
