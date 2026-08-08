@@ -5006,90 +5006,20 @@ def preflight_elaborazione_mappe(req: https_fn.CallableRequest):
     hanno contaminazioni (fornitori misti).
     Restituisce un dizionario con i dati necessari al frontend per decidere lo scenario (A, B o C).
     """
-    try:
-        import json
-        data_consegna = req.data.get("data_consegna")
-        if not data_consegna:
-            return {"status": "errore", "message": "data_consegna mancante"}
-            
-        bucket = storage.bucket(name=BUCKET_NAME)
-        
-        in_elaborazione = {
-            "CATTEL": False,
-            "GRAN_CHEF": False,
-            "DAC": False,
-            "DNR": False
-        }
-        
-        # Controlliamo CATTEL
-        if list(bucket.list_blobs(prefix=f"split_ddt/{data_consegna}/CATTEL/ddt_estratti")):
-            in_elaborazione["CATTEL"] = True
-            
-        # Controlliamo GRAN_CHEF
-        if list(bucket.list_blobs(prefix=f"split_ddt/{data_consegna}/GRAND_CHEF/ddt_estratti")):
-            in_elaborazione["GRAN_CHEF"] = True
-            
-        # Controlliamo DAC
-        if list(bucket.list_blobs(prefix=f"split_ddt/{data_consegna}/DAC/ddt_estratti")):
-            in_elaborazione["DAC"] = True
-            
-        # Controlliamo DNR (FRUTTA o LATTE)
-        if list(bucket.list_blobs(prefix=f"split_ddt/{data_consegna}/FRUTTA/ddt_estratti")) or \
-           list(bucket.list_blobs(prefix=f"split_ddt/{data_consegna}/LATTE/ddt_estratti")):
-            in_elaborazione["DNR"] = True
-            
-        # Troviamo quali file ddt_estratti causano l'elaborazione per usarli nel calcolo contaminazione
-        ddt_presenti = [k for k, v in in_elaborazione.items() if v]
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
 
-        # Adesso leggiamo i viaggi vecchi (cassaforte) per vedere se ci sono viaggi contaminati
-        elaborati_esistenti = {"CATTEL": False, "GRAN_CHEF": False, "DAC": False, "DNR": False}
-        contaminati = False
-        
-        try:
-            blob_old_json = bucket.blob(f"REPORTS/{data_consegna}/viaggi_giornalieri_Johnson.json")
-            if blob_old_json.exists():
-                old_data = json.loads(blob_old_json.download_as_string().decode('utf-8'))
-                old_zones = old_data.get("zone", []) if isinstance(old_data, dict) else old_data
-                
-                for zona in old_zones:
-                    stops = zona.get("stops", [])
-                    
-                    # Quali tenant sono presenti in questo viaggio?
-                    tenants_in_trip = set()
-                    for stop in stops:
-                        stop_comp = stop.get("competenze", [])
-                        if stop_comp:
-                            for comp in stop_comp:
-                                tenants_in_trip.add(get_tenant_from_cz(comp))
-                        else:
-                            tenants_in_trip.add(get_tenant_from_cz(zona.get("cliente_zona", "")))
-                        
-                    for t in tenants_in_trip:
-                        if t in elaborati_esistenti:
-                            elaborati_esistenti[t] = True
-                            
-                    # Controllo contaminazione:
-                    tenants_da_aggiornare = tenants_in_trip.intersection(set(ddt_presenti))
-                    tenants_da_preservare = tenants_in_trip - set(ddt_presenti)
-                    
-                    if len(tenants_da_aggiornare) > 0 and len(tenants_da_preservare) > 0:
-                        contaminati = True
-        except Exception as e:
-            print(f"[WARN] preflight: Impossibile leggere viaggi_giornalieri_Johnson.json: {e}")
+    data_consegna = req.data.get("data_consegna")
+    if not data_consegna:
+        return {"status": "errore", "message": "data_consegna mancante"}
 
-        return {
-            "status": "ok",
-            "in_elaborazione": in_elaborazione,
-            "elaborati_esistenti": elaborati_esistenti,
-            "contaminazione": contaminati
-        }
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"status": "errore", "message": f"Errore interno preflight: {str(e)}"}
+    bucket = storage.bucket(name=BUCKET_NAME)
 
-# ─── GESTIONE E RIPRISTINO BACKUP CACHE DISTANZE (R&D / SICUREZZA) ─────────────
-
+    from services.operations_service import handle_preflight_elaborazione_mappe
+    return handle_preflight_elaborazione_mappe(data_consegna, bucket, get_tenant_from_cz)
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.MB_256, timeout_sec=60,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def ripristina_cache_backup(req: https_fn.CallableRequest):
