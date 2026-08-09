@@ -4967,6 +4967,12 @@ def core_aggiorna_traffico_serale(data_consegna):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def aggiorna_traffico_serale(req: https_fn.CallableRequest):
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
+
     try:
         data_consegna = req.data.get("data_consegna")
         return core_aggiorna_traffico_serale(data_consegna)
