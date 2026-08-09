@@ -5229,81 +5229,6 @@ from email import encoders
 import imaplib
 import base64
 
-def send_and_save_email(smtp_host, smtp_port, imap_host, imap_port, email_user, email_password, to_email, subject, body_text, attachments=[], sender_name=None, smtp_security="auto"):
-    # 1. Composizione Email
-    msg = MIMEMultipart()
-    
-    if sender_name:
-        from email.utils import formataddr
-        msg['From'] = formataddr((sender_name, email_user))
-    else:
-        msg['From'] = email_user
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    
-    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
-    
-    for filename, file_data_base64 in attachments:
-        if file_data_base64:
-            try:
-                file_data = base64.b64decode(file_data_base64)
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(file_data)
-                encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-                msg.attach(part)
-            except Exception as err_attach:
-                logger.error(f"[EMAIL-ATTACH] Errore codifica allegato {filename}: {str(err_attach)}")
-            
-    # 2. Invio via SMTP
-    try:
-        # Se esplicitamente 'ssl' oppure se 'auto' su porta 465
-        if smtp_security == "ssl" or (smtp_security == "auto" and smtp_port == 465):
-            server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
-        else:
-            server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
-            if smtp_security == "tls" or smtp_security == "auto":
-                server.starttls()
-            
-        server.login(email_user, email_password)
-        server.sendmail(email_user, [to_email], msg.as_string())
-        server.close()
-    except Exception as e:
-        logger.error(f"[EMAIL-SMTP] Errore invio SMTP: {str(e)}")
-        raise RuntimeError(f"Errore connessione SMTP o credenziali errate: {str(e)}")
-        
-    # 3. Salvataggio via IMAP nella cartella Posta Inviata (Sent)
-    try:
-        mail = imaplib.IMAP4_SSL(imap_host, imap_port, timeout=30)
-        mail.login(email_user, email_password)
-        
-        status, folder_list = mail.list()
-        sent_folder = None
-        if status == 'OK':
-            for f in folder_list:
-                f_str = f.decode('utf-8')
-                # Analizza nome cartella standard
-                parts = f_str.split(' "/" ')
-                if len(parts) < 2:
-                    parts = f_str.split(' "." ')
-                
-                folder_name = parts[-1].replace('"', '').strip() if len(parts) >= 2 else f_str
-                fn_lower = folder_name.lower()
-                if "invia" in fn_lower or "sent" in fn_lower or "inviati" in fn_lower:
-                    sent_folder = folder_name
-                    break
-                    
-        if not sent_folder:
-            sent_folder = "Sent"
-            
-        mail.append(sent_folder, '\\Seen', imaplib.Time2Internaldate(time.time()), msg.as_bytes())
-        mail.logout()
-        return True
-    except Exception as e:
-        logger.error(f"[EMAIL-IMAP] Errore salvataggio IMAP: {str(e)}")
-        return False
-
-
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.MB_512, timeout_sec=120,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def invia_email_fattura(req: https_fn.CallableRequest):
@@ -5315,6 +5240,9 @@ def invia_email_fattura(req: https_fn.CallableRequest):
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
             message="Non autorizzato."
         )
+
+    from services.email_service import handle_invia_email_fattura
+    return handle_invia_email_fattura(req.data, get_db())
 
     azione = req.data.get("azione")
     
