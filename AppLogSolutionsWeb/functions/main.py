@@ -5570,6 +5570,11 @@ def genera_riepiloghi_aziendali_light(req: https_fn.CallableRequest) -> typing.A
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.MB_256, timeout_sec=60)
 def admin_update_role(req: https_fn.CallableRequest) -> typing.Any:
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
     from services.admin_service import handle_admin_update_role
     return handle_admin_update_role(req)
 
