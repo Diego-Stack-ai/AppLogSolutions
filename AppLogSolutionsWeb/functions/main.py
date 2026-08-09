@@ -5310,6 +5310,12 @@ def invia_email_fattura(req: https_fn.CallableRequest):
     """
     Spedisce l'email con allegati e la inserisce nella cartella Posta Inviata IMAP.
     """
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
+
     azione = req.data.get("azione")
     
     if azione == "test_smtp":
