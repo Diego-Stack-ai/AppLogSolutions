@@ -1503,77 +1503,6 @@ async function applicaESalvaRiordino() {{
 </body></html>"""
 
 
-def core_genera_mappa_autista(viaggio_id, distinta_url=None, tenant=None):
-    start_time = time.time()
-    if not viaggio_id:
-        return {"status": "errore", "message": "viaggio_id mancante", "errori": ["viaggio_id mancante"], "data": {}}
-
-    doc_ref, doc_viaggio, tenant_viaggio = _get_viaggio_doc_self_healing(viaggio_id, tenant)
-    if not doc_viaggio.exists:
-        return {"status": "errore", "message": "Viaggio non trovato", "errori": ["Viaggio non trovato"], "data": {}}
-
-    viaggio = doc_viaggio.to_dict()
-    punti = viaggio.get("punti_ottimizzati") or viaggio.get("punti", [])
-    if not punti:
-        return {"status": "errore", "message": "Viaggio senza punti", "errori": ["Punti vuoti"], "data": {}}
-
-    punti_norm = []
-    for p in punti:
-        try:
-            punti_norm.append({**p, "lat": float(p["lat"]), "lon": float(p.get("lon", p.get("lng", 0)))})
-        except:
-            pass
-
-    depot = _get_depot_for_points_cloud(punti_norm)
-    km, sec_guida, polylines = _get_directions_data(punti_norm, depot=depot)
-
-    if not distinta_url:
-        distinta_url = viaggio.get("distinta_url") or viaggio.get("distinta_light")
-
-    ora_partenza_calc = viaggio.get("_stats", {}).get("ora_partenza", "07:00")
-    
-    cliente_zona = viaggio.get("cliente_zona", "")
-    nome_giro = viaggio.get("nome_giro", viaggio_id)
-    if cliente_zona and cliente_zona.upper() not in nome_giro.upper():
-        titolo_giro = f"{cliente_zona.upper()} - {nome_giro}"
-    else:
-        titolo_giro = nome_giro
-        
-    html = _genera_html_mappa(titolo_giro, punti_norm, km, sec_guida, polylines, depot=depot, distinta_url=distinta_url, ora_partenza_dep=ora_partenza_calc, actual_viaggio_id=viaggio_id)
-
-    bucket = storage.bucket(name=BUCKET_NAME)
-    data_viaggio = viaggio.get("data", "sconosciuta").replace("/", "-")
-    html_path = f"{tenant_viaggio}/CONSEGNE/CONSEGNE_{data_viaggio}/MAPPE_AUTISTI/{viaggio_id}.html"
-    blob = bucket.blob(html_path)
-    blob.upload_from_string(html.encode("utf-8"), content_type="text/html; charset=utf-8")
-    url_pubblica = _genera_url_storage_token(blob)
-
-    doc_ref.update({
-        "mappa_url": url_pubblica,
-        "km_reali": km,
-        "t_guida_min": sec_guida // 60,
-        "t_tot_min": (sec_guida // 60) + len(punti_norm) * TIME_PER_STOP_MIN
-    })
-
-    elapsed = time.time() - start_time
-    _registra_statistica("genera_mappa_autista", elapsed)
-
-    return {
-        "status": "ok",
-        "message": f"Mappa generata in {elapsed:.2f}s ({len(polylines)} tratti stradali)",
-        "errori": [],
-        "data": {
-            "viaggio_id": viaggio_id,
-            "mappa_url": url_pubblica,
-            "km_reali": km,
-            "t_guida_min": sec_guida // 60,
-            "n_polylines": len(polylines),
-            "tempo_sec": elapsed
-        }
-    }
-
-
-# ─── PUNTO #5: RICALCOLO ISTANTANEO PERCORSO RIORDINATO ──────────────────────
 
 def core_ricalcola_percorso(viaggio_id, nuovi_punti, num_locked=0):
     """
@@ -4614,7 +4543,22 @@ def genera_mappa_autista(req: https_fn.CallableRequest):
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
             message="Non autorizzato."
         )
-    return core_genera_mappa_autista(req.data.get("viaggio_id"), req.data.get("distinta_url"), req.data.get("tenant"))
+    
+    from services.map_service import handle_genera_mappa_autista
+    
+    return handle_genera_mappa_autista(
+        viaggio_id=req.data.get("viaggio_id"),
+        distinta_url=req.data.get("distinta_url"),
+        tenant=req.data.get("tenant"),
+        get_viaggio_doc_fn=_get_viaggio_doc_self_healing,
+        get_depot_fn=_get_depot_for_points_cloud,
+        get_directions_data_fn=_get_directions_data,
+        genera_html_fn=_genera_html_mappa,
+        bucket=storage.bucket(name=BUCKET_NAME),
+        genera_url_token_fn=_genera_url_storage_token,
+        registra_statistica_fn=_registra_statistica,
+        time_per_stop_min=TIME_PER_STOP_MIN
+    )
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
