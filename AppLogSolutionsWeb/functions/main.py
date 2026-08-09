@@ -4568,6 +4568,11 @@ def genera_mappa_autista(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def ricalcola_percorso(req: https_fn.CallableRequest):
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
     return core_ricalcola_percorso(
         req.data.get("viaggio_id"),
         req.data.get("punti", []),
