@@ -4936,6 +4936,11 @@ def preflight_elaborazione_mappe(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.MB_256, timeout_sec=60,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def ripristina_cache_backup(req: https_fn.CallableRequest):
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
     """
     Gestione backup cache:
     - azione == 'lista': restituisce l'elenco dei backup disponibili in caches_backup/
