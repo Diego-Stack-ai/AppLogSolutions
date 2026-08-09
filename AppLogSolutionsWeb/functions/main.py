@@ -432,6 +432,11 @@ def _registra_statistica(tipo_operazione, tempo_sec, errori=0):
 
 @https_fn.on_call()
 def admin_reset_password(req: https_fn.CallableRequest) -> dict:
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
     from services.admin_service import handle_admin_reset_password
     return handle_admin_reset_password(req)
 
