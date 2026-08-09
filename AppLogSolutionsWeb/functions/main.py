@@ -4533,6 +4533,11 @@ def genera_distinta_viaggio(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def ottimizza_viaggio(req: https_fn.CallableRequest):
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
     return core_ottimizza_viaggio(req.data.get("viaggio_id"))
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
