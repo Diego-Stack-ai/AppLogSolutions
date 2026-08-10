@@ -4666,6 +4666,27 @@ def chiudi_giornata(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def genera_report_giornaliero(req: https_fn.CallableRequest):
+    if not req.auth or not req.auth.uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
+    
+    caller_uid = req.auth.uid
+    dipendente_doc = get_db().collection("dipendenti").document(caller_uid).get()
+    if not dipendente_doc.exists:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Permessi insufficienti."
+        )
+    
+    ruolo = dipendente_doc.to_dict().get("ruolo", "").lower()
+    if ruolo not in ["amministratore", "impiegata"]:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Permessi insufficienti."
+        )
+
     try:
         data_consegna = req.data.get("data_consegna") if isinstance(req.data, dict) else None
         tipologie_da_elaborare = req.data.get("tipologie_da_elaborare", []) if isinstance(req.data, dict) else []
