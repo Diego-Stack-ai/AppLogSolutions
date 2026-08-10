@@ -5158,6 +5158,27 @@ def recupera_viaggio_storico(req: https_fn.CallableRequest):
     - azione == 'lista_giornate': elenca le date in ARCHIVIO_STORICO_RD/[mese]/
     - azione == 'recupera': ripristina i dati in viaggi ddt con flag is_recupero_rd: True
     """
+    if not req.auth or not req.auth.uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
+    
+    caller_uid = req.auth.uid
+    dipendente_doc = get_db().collection("dipendenti").document(caller_uid).get()
+    if not dipendente_doc.exists:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Permessi insufficienti."
+        )
+    
+    ruolo = dipendente_doc.to_dict().get("ruolo", "").lower()
+    if ruolo not in ["amministratore", "impiegata"]:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Permessi insufficienti."
+        )
+
     from services.history_service import handle_recupera_viaggio_storico
     return handle_recupera_viaggio_storico(
         req,
