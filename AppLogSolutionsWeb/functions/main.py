@@ -4655,6 +4655,12 @@ def check_giornaliero(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=60,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def stats_giornaliere(req: https_fn.CallableRequest):
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
+    print(f"[DEPRECATION] LEGACY_ENDPOINT_INVOKED endpoint=stats_giornaliere uid={req.auth.uid}")
     from services.monitoring_service import handle_stats_giornaliere
     return handle_stats_giornaliere(req)
 
