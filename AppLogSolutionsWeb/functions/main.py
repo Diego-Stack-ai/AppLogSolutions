@@ -4501,6 +4501,13 @@ def risolvi_tenant_consegna(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=540,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def web_calcola_percorsi(req: https_fn.CallableRequest):
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
+    uid = req.auth.uid if req.auth else "unknown"
+    print(f"LEGACY_ENDPOINT_INVOKED endpoint=web_calcola_percorsi uid={uid}")
     try:
         data_consegna = req.data.get("data_consegna")
         id_zona = req.data.get("id_zona") or req.data.get("target_zones")
@@ -4516,6 +4523,13 @@ def web_calcola_percorsi(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_2, timeout_sec=540,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def genera_completo_giornata(req: https_fn.CallableRequest):
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="Non autorizzato."
+        )
+    uid = req.auth.uid if req.auth else "unknown"
+    print(f"LEGACY_ENDPOINT_INVOKED endpoint=genera_completo_giornata uid={uid}")
     try:
         data_consegna = req.data.get("data_consegna")
         tenant = req.data.get("tenant", "DNR")
