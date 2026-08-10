@@ -4723,10 +4723,23 @@ def elimina_giornata_logistica(req: https_fn.CallableRequest):
     - Se passate tipologie_da_eliminare / tenant_da_eliminare: elimina solo quelle tipologie e tenant specifici (Sovrascrittura Parziale).
     - Altrimenti: elimina completamente una giornata (split_ddt, REPORTS, CONSEGNE e record Firestore).
     """
-    if not req.auth:
+    if not req.auth or not req.auth.uid:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
             message="Non autorizzato."
+        )
+
+    caller_uid = req.auth.uid
+    caller_doc = (
+        get_db()
+        .collection("dipendenti")
+        .document(caller_uid)
+        .get()
+    )
+    if not caller_doc.exists or caller_doc.to_dict().get("ruolo") != "amministratore":
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Permessi insufficienti."
         )
 
     data_consegna = req.data.get("data_consegna")
