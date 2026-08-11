@@ -4598,10 +4598,18 @@ def ottimizza_viaggio(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def genera_mappa_autista(req: https_fn.CallableRequest):
-    if not req.auth:
+    if not req.auth or not req.auth.uid:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
             message="Non autorizzato."
+        )
+
+    caller_uid = req.auth.uid
+    caller_doc = get_db().collection("dipendenti").document(caller_uid).get()
+    if not caller_doc.exists or caller_doc.to_dict().get("ruolo") not in ["amministratore", "impiegata"]:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Permessi insufficienti."
         )
     
     from services.map_service import handle_genera_mappa_autista
@@ -5021,10 +5029,18 @@ def preflight_elaborazione_mappe(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.MB_256, timeout_sec=60,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def ripristina_cache_backup(req: https_fn.CallableRequest):
-    if not req.auth:
+    if not req.auth or not req.auth.uid:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
             message="Non autorizzato."
+        )
+
+    caller_uid = req.auth.uid
+    caller_doc = get_db().collection("dipendenti").document(caller_uid).get()
+    if not caller_doc.exists or caller_doc.to_dict().get("ruolo") != "amministratore":
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="Permessi insufficienti."
         )
     """
     Gestione backup cache:
@@ -5574,7 +5590,18 @@ def genera_riepiloghi_aziendali_light(req: https_fn.CallableRequest) -> typing.A
     try:
         # Verifica auth
         if not req.auth or not req.auth.uid:
-            return {"status": "errore", "message": "Non autorizzato"}
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+                message="Non autorizzato."
+            )
+
+        caller_uid = req.auth.uid
+        caller_doc = get_db().collection("dipendenti").document(caller_uid).get()
+        if not caller_doc.exists or caller_doc.to_dict().get("ruolo") not in ["amministratore", "impiegata"]:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+                message="Permessi insufficienti."
+            )
             
         data_consegna = req.data.get("data_consegna")
         if not data_consegna:
