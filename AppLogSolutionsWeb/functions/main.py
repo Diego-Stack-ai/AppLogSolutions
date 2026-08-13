@@ -4501,99 +4501,41 @@ def risolvi_tenant_consegna(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=540,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def web_calcola_percorsi(req: https_fn.CallableRequest):
-    if not req.auth or not req.auth.uid:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="Non autorizzato."
-        )
-
-    caller_uid = req.auth.uid
-    caller_doc = get_db().collection("dipendenti").document(caller_uid).get()
-    allowed_roles = {"amministratore", "impiegata"}
-    
-    if not caller_doc.exists or caller_doc.to_dict().get("ruolo") not in allowed_roles:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
-            message="Permessi insufficienti."
-        )
-
-    uid = req.auth.uid if req.auth else "unknown"
-    print(f"LEGACY_ENDPOINT_INVOKED endpoint=web_calcola_percorsi uid={uid}")
-    try:
-        data_consegna = req.data.get("data_consegna")
-        id_zona = req.data.get("id_zona") or req.data.get("target_zones")
-        aggiorna_traffico = bool(req.data.get("aggiorna_traffico", False))
-        usa_or_tools = bool(req.data.get("usa_or_tools", True))
-        tenant = req.data.get("tenant", "DNR")
-        return core_web_calcola_percorsi(data_consegna, id_zona, aggiorna_traffico, usa_or_tools, tenant)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"status": "errore", "message": f"Global exception: {str(e)}"}
+    if not req.auth or not req.auth.uid: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+    caller_doc = get_db().collection("dipendenti").document(req.auth.uid).get()
+    if not caller_doc.exists or caller_doc.to_dict().get("ruolo") not in {"amministratore", "impiegata"}: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.PERMISSION_DENIED, message="Negato.")
+    from services.routing_service import handle_web_calcola_percorsi
+    return handle_web_calcola_percorsi(req)
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_2, timeout_sec=540,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def genera_completo_giornata(req: https_fn.CallableRequest):
-    if not req.auth:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="Non autorizzato."
-        )
-    uid = req.auth.uid if req.auth else "unknown"
-    print(f"LEGACY_ENDPOINT_INVOKED endpoint=genera_completo_giornata uid={uid}")
-    try:
-        data_consegna = req.data.get("data_consegna")
-        tenant = req.data.get("tenant", "DNR")
-        return core_genera_completo_giornata(data_consegna, tenant)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"status": "errore", "message": f"Global exception: {str(e)}"}
+    if not req.auth: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+    from services.routing_service import handle_genera_completo_giornata
+    return handle_genera_completo_giornata(req)
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=540,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def processa_job_pdf(req: https_fn.CallableRequest):
-    if not req.auth or not req.auth.uid:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="Non autorizzato."
-        )
-
-    caller_uid = req.auth.uid
-    caller_doc = (
-        get_db()
-        .collection("dipendenti")
-        .document(caller_uid)
-        .get()
-    )
-    if not caller_doc.exists or caller_doc.to_dict().get("ruolo") not in {"amministratore", "impiegata", "fornitore"}:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
-            message="Permessi insufficienti."
-        )
-
-    return core_processa_job_pdf(req.data.get("job_id"), req.data.get("tenant", "DNR"))
+    if not req.auth or not req.auth.uid: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+    caller_doc = get_db().collection("dipendenti").document(req.auth.uid).get()
+    if not caller_doc.exists or caller_doc.to_dict().get("ruolo") not in {"amministratore", "impiegata"}: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.PERMISSION_DENIED, message="Negato.")
+    from services.pdf_service import handle_processa_job_pdf
+    return handle_processa_job_pdf(req)
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def genera_distinta_viaggio(req: https_fn.CallableRequest):
-    if not req.auth:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="Non autorizzato."
-        )
-    print(f"[DEPRECATION] LEGACY_ENDPOINT_INVOKED endpoint=genera_distinta_viaggio uid={req.auth.uid}")
-    return core_genera_distinta_viaggio(req.data.get("viaggio_id"))
+    if not req.auth: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+    from services.routing_service import handle_genera_distinta_viaggio
+    return handle_genera_distinta_viaggio(req)
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def ottimizza_viaggio(req: https_fn.CallableRequest):
-    if not req.auth:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="Non autorizzato."
-        )
-    return core_ottimizza_viaggio(req.data.get("viaggio_id"))
+    if not req.auth: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+    from services.routing_service import handle_ottimizza_viaggio
+    return handle_ottimizza_viaggio(req)
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
@@ -4631,16 +4573,9 @@ def genera_mappa_autista(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=300,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def ricalcola_percorso(req: https_fn.CallableRequest):
-    if not req.auth:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="Non autorizzato."
-        )
-    return core_ricalcola_percorso(
-        req.data.get("viaggio_id"),
-        req.data.get("punti", []),
-        int(req.data.get("num_locked", 0))
-    )
+    if not req.auth: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+    from services.routing_service import handle_ricalcola_percorso
+    return handle_ricalcola_percorso(req)
 
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=540,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
@@ -4946,24 +4881,11 @@ def elimina_giornata_logistica(req: https_fn.CallableRequest):
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=540,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def calcola_percorsi_zone(req: https_fn.CallableRequest):
-    if not req.auth:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="Non autorizzato."
-        )
-    """Alias compatibile con mappa_percorsi.html che reindirizza al core_web_calcola_percorsi."""
-    try:
-        data_consegna = req.data.get("data_consegna")
-        zona_ids = req.data.get("zona_ids") or req.data.get("target_zones")
-        return core_web_calcola_percorsi(data_consegna, id_zona=zona_ids)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"status": "errore", "message": f"Global exception: {str(e)}"}
+    if not req.auth: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+    from services.routing_service import handle_calcola_percorsi_zone
+    return handle_calcola_percorsi_zone(req)
 
 
-        print(f"[BAT7B] Directions API errore tratta {lat_f},{lon_f}->{lat_t},{lon_t}: {e}")
-    return max(1, int(_haversine(p_from, p_to) / 12))
 
 
 
@@ -5758,14 +5680,12 @@ def admin_update_role(req: https_fn.CallableRequest) -> typing.Any:
     from services.admin_service import handle_admin_update_role
     return handle_admin_update_role(req)
 
-@https_fn.on_call(timeout_sec=300)
-@https_fn.on_call(region="europe-west1", timeout_sec=300, memory=options.MemoryOption.GB_1)
-def elabora_centro_costi(req: https_fn.CallableRequest) -> typing.Any:
+def core_elabora_centro_costi(req_data: dict, uid: str) -> typing.Any:
     if not req.auth:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
     
-    file_path = req.data.get("filePath")
-    mese_riferimento = req.data.get("meseRiferimento")
+    file_path = req_data.get("filePath")
+    mese_riferimento = req_data.get("meseRiferimento")
     
     if not file_path or not mese_riferimento:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Parametri mancanti.")
@@ -5899,3 +5819,9 @@ def get_backend_version(req: https_fn.CallableRequest) -> typing.Any:
 # Import AI Agents - SPOSTATI NELLA NUOVA CODEBASE 'ai' PER EVITARE TIMEOUT
 # from ai_agents import agent_extractor, agent_chat_assistant
 
+
+@https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=60)
+def elabora_centro_costi(req: https_fn.CallableRequest) -> typing.Any:
+    if not req.auth: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+    from services.cost_service import handle_elabora_centro_costi
+    return handle_elabora_centro_costi(req)
