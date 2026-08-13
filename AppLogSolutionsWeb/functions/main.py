@@ -5825,3 +5825,31 @@ def elabora_centro_costi(req: https_fn.CallableRequest) -> typing.Any:
     if not req.auth: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
     from services.cost_service import handle_elabora_centro_costi
     return handle_elabora_centro_costi(req)
+
+@https_fn.on_call(region="europe-west1", memory=options.MemoryOption.MB_512, timeout_sec=120, secrets=["GEMINI_API_KEY"])
+def agent_extractor(req: https_fn.CallableRequest) -> typing.Any:
+    if not req.auth:
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+    
+    uid = req.auth.uid
+    db = firestore.client()
+    doc = db.collection("dipendenti").document(uid).get()
+    if not doc.exists or doc.to_dict().get("ruolo") != "amministratore":
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.PERMISSION_DENIED, message="Operazione non consentita.")
+        
+    import ai_agents
+    return ai_agents.agent_extractor(req)
+
+@https_fn.on_call(region="europe-west1", timeout_sec=120, secrets=["GEMINI_API_KEY"])
+def agent_chat_assistant(req: https_fn.CallableRequest) -> typing.Any:
+    if not req.auth:
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
+        
+    uid = req.auth.uid
+    db = firestore.client()
+    doc = db.collection("dipendenti").document(uid).get()
+    if not doc.exists or doc.to_dict().get("ruolo") != "amministratore":
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.PERMISSION_DENIED, message="Operazione non consentita.")
+        
+    import ai_agents
+    return ai_agents.agent_chat_assistant(req)

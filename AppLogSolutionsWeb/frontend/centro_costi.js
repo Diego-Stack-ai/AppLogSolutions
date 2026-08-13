@@ -4,17 +4,39 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 
 const storage = getStorage(app);
 const functions = getFunctions(app, "europe-west1");
-
 document.addEventListener('DOMContentLoaded', () => {
+    // Hide AI by default, wait for auth sync to show it if admin
+    const aiTab = document.getElementById('tab-ai-chat');
+    if (aiTab) aiTab.style.display = 'none';
+    
     document.getElementById('fileAI').addEventListener('change', async (e) => {
         if(e.target.files.length) {
             const file = e.target.files[0];
             await processaFileAI(file);
         }
     });
+    
+    // Auth observer per abilitare UI solo agli amministratori
+    import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js').then(authModule => {
+        import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js').then(firestoreModule => {
+            const auth = authModule.getAuth(app);
+            const firestoreDb = firestoreModule.getFirestore(app);
+            authModule.onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    const docSnap = await firestoreModule.getDoc(firestoreModule.doc(firestoreDb, "dipendenti", user.uid));
+                    if (docSnap.exists() && docSnap.data().ruolo === 'amministratore') {
+                        if (aiTab) aiTab.style.display = 'block';
+                    }
+                }
+            });
+        });
+    });
 });
 
+let isAIProcessing = false;
 async function processaFileAI(file) {
+    if (isAIProcessing) return;
+    isAIProcessing = true;
     document.getElementById('loadingOverlay').style.display = 'flex';
     document.getElementById('loadingText').innerText = "Caricamento documento nel cloud...";
     try {
@@ -38,6 +60,7 @@ async function processaFileAI(file) {
     } finally {
         document.getElementById('fileAI').value = '';
         document.getElementById('loadingOverlay').style.display = 'none';
+        isAIProcessing = false;
     }
 }
 
@@ -67,10 +90,19 @@ window.speakText = function(text) {
     }
 };
 
+let isChatProcessing = false;
 window.sendChatMessage = async function() {
+    if (isChatProcessing) return;
     const input = document.getElementById('chatInputText');
     const text = input.value.trim();
     if (!text) return;
+    if (text.length > 1000) {
+        Swal.fire("Attenzione", "Messaggio troppo lungo (max 1000 caratteri)", "warning");
+        return;
+    }
+    
+    isChatProcessing = true;
+    input.disabled = true;
     
     const messagesDiv = document.getElementById('chatMessages');
     
@@ -117,6 +149,10 @@ window.sendChatMessage = async function() {
         errorMsg.className = 'chat-message ai';
         errorMsg.innerHTML = `<strong style="color:red">Errore Server:</strong> ${e.message}`;
         messagesDiv.appendChild(errorMsg);
+    } finally {
+        isChatProcessing = false;
+        input.disabled = false;
+        input.focus();
     }
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 };

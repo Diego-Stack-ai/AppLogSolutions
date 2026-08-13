@@ -13,7 +13,9 @@ db = firestore.client()
 # Configurazione API Key di Gemini (ideale metterla nei Firebase Secrets in produzione)
 def get_genai_model(system_instruction=None, tools=None):
     import google.generativeai as genai
-    GENAI_API_KEY = os.environ.get("GEMINI_API_KEY", "INSERISCI_QUI_LA_TUA_CHIAVE")
+    GENAI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    if not GENAI_API_KEY:
+        raise ValueError("AI_NOT_CONFIGURED")
     genai.configure(api_key=GENAI_API_KEY)
     
     generation_config = {
@@ -54,8 +56,7 @@ Formato Richiesto:
 
 from firebase_functions import https_fn
 
-@https_fn.on_call(region="europe-west1", memory=options.MemoryOption.MB_512, timeout_sec=120)
-def agent_extractor(req: https_fn.CallableRequest) -> any:
+def agent_extractor(req) -> any:
     """
     Agente 1: Analizza il documento caricato tramite Gemini e salva i dati.
     """
@@ -64,8 +65,11 @@ def agent_extractor(req: https_fn.CallableRequest) -> any:
     import re
     
     file_path = req.data.get("filePath", "")
-    if not file_path:
-        return {"status": "error", "message": "Nessun filePath fornito."}
+    if not file_path or not isinstance(file_path, str):
+        return {"status": "error", "code": "AI_INVALID_INPUT", "message": "Nessun filePath fornito o formato non valido."}
+        
+    if not file_path.startswith("imports/documenti_ai/"):
+        return {"status": "error", "code": "AI_FORBIDDEN", "message": "Accesso al path Storage negato."}
 
     print(f"[AI Extractor] Avvio elaborazione intelligente del file: {file_path}")
 
@@ -124,13 +128,18 @@ def agent_extractor(req: https_fn.CallableRequest) -> any:
         print(f"[AI Extractor] ERRORE: {str(e)}")
         return {"status": "error", "message": str(e)}
 
-@https_fn.on_call(region="europe-west1", timeout_sec=120)
-def agent_chat_assistant(req: https_fn.CallableRequest) -> any:
+def agent_chat_assistant(req) -> any:
     message = req.data.get("message", "")
     mese = req.data.get("mese", "")
     
-    if not message:
-        return {"status": "error", "message": "Nessun messaggio fornito."}
+    if not message or not isinstance(message, str):
+        return {"status": "error", "code": "AI_INVALID_INPUT", "message": "Messaggio non valido."}
+    
+    if len(message) > 1000:
+        return {"status": "error", "code": "AI_INVALID_INPUT", "message": "Messaggio troppo lungo (max 1000 caratteri)."}
+        
+    if mese and not re.match(r"^\d{4}-\d{2}$", str(mese)):
+        return {"status": "error", "code": "AI_INVALID_INPUT", "message": "Formato mese non valido (atteso YYYY-MM)."}
 
     # Definizione Tools per Gemini
     def get_costi_carburante(mese: str, targa: str = "") -> dict:
