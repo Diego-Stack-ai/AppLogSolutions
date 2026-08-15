@@ -1,5 +1,6 @@
 from firebase_admin import firestore
 import datetime
+from firebase_functions import https_fn
 
 def handle_chiudi_giornata(db) -> dict:
     print("[INFO] Tentativo chiusura giornata")
