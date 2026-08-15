@@ -1803,7 +1803,21 @@ const functions = getFunctions(app, "europe-west1");
                     }
                 });
 
-                await setDoc(doc(db, "config", "permessi_dashboard"), newPermessi);
+                const docRef = doc(db, "config", "permessi_dashboard");
+                const currentSnap = await getDoc(docRef);
+                const currentPermessi = currentSnap.exists() ? currentSnap.data() : {};
+
+                // Deep Merge logic
+                Object.keys(newPermessi).forEach(page => {
+                    if (!currentPermessi[page]) {
+                        currentPermessi[page] = {};
+                    }
+                    Object.keys(newPermessi[page]).forEach(role => {
+                        currentPermessi[page][role] = newPermessi[page][role];
+                    });
+                });
+
+                await setDoc(docRef, currentPermessi);
                 
                 Swal.fire({
                     title: 'Salvato',

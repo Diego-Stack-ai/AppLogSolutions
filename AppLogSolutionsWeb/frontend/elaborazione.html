@@ -1339,17 +1339,24 @@
                 // 1. PULIZIA PREVENTIVA SELETTIVA
                 statText.textContent = `Pulizia preventiva dei vecchi dati (${clientsStr})...`;
                 console.log('[Upload] Inizio pulizia preventiva per:', tipologie_caricate);
-                const eliminaGiornataFn = httpsCallable(functions, 'elimina_giornata_logistica', { timeout: 120000 });
                 
-                await eliminaGiornataFn({
-                    data_consegna: dateFormatted,
-                    soft_delete: false,
-                    tipologie_da_eliminare: tipologie_caricate,
-                    tenant_da_eliminare: tenant_caricati,
-                    cliente_zona_da_eliminare: cliente_zona_caricati
-                });
-
-                console.log('[Upload] Pulizia completata. Inizio caricamento file.');
+                try {
+                    const eliminaGiornataFn = httpsCallable(functions, 'elimina_giornata_logistica', { timeout: 120000 });
+                    await eliminaGiornataFn({
+                        data_consegna: dateFormatted,
+                        soft_delete: false,
+                        tipologie_da_eliminare: tipologie_caricate,
+                        tenant_da_eliminare: tenant_caricati,
+                        cliente_zona_da_eliminare: cliente_zona_caricati
+                    });
+                    console.log('[Upload] Pulizia completata. Inizio caricamento file.');
+                } catch (err) {
+                    if (err?.code === "functions/permission-denied" || err?.code === "permission-denied") {
+                        console.warn("[Upload] Pulizia preventiva non autorizzata: proseguo senza cancellazione.");
+                    } else {
+                        throw err;
+                    }
+                }
 
                 // Upload Frutta
                 for (let file of filesFrutta) {

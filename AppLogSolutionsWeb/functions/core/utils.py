@@ -58,3 +58,64 @@ def normalize_code(raw, articoli_noti):
     variant = re.sub(r'\s+', ' ', variant)
     variant = re.sub(r'-{2,}', '-', variant).strip('-').strip()
     return code_base, variant
+
+from infrastructure.firebase_setup import BUCKET_NAME
+def _genera_url_storage_token(blob):
+    import uuid
+    from urllib.parse import quote
+    
+    # Prova a recuperare il token esistente dai metadati per evitare di invalidare vecchi link
+    try:
+        blob.reload()
+        if blob.metadata and "firebaseStorageDownloadTokens" in blob.metadata:
+            token = blob.metadata["firebaseStorageDownloadTokens"]
+            return f"https://firebasestorage.googleapis.com/v0/b/{BUCKET_NAME}/o/{quote(blob.name, safe='')}?alt=media&token={token}"
+    except Exception as e_meta:
+        print(f"[WARN] Impossibile leggere metadati esistenti per token: {e_meta}")
+        
+    token = str(uuid.uuid4())
+    blob.metadata = {"firebaseStorageDownloadTokens": token}
+    blob.patch()
+    return f"https://firebasestorage.googleapis.com/v0/b/{BUCKET_NAME}/o/{quote(blob.name, safe='')}?alt=media&token={token}"
+
+
+
+from infrastructure.firebase_setup import get_db
+def _registra_statistica(tipo_operazione, tempo_sec, errori=0):
+    oggi = str(date.today())
+    stats_ref = get_db().collection('stats_monitoring').document(oggi)
+    
+    try:
+        doc = stats_ref.get()
+        if doc.exists:
+            d = doc.to_dict()
+            tot_tempo = d.get('tempo_totale_sec', 0) + tempo_sec
+            tot_ops = d.get('operazioni_totali', 0) + 1
+            tot_err = d.get('errori_totali', 0) + errori
+            
+            # Specifiche per tipo API
+            tipo_count = d.get(f'count_{tipo_operazione}', 0) + 1
+            tipo_tempo = d.get(f'tempo_{tipo_operazione}', 0) + tempo_sec
+            
+            stats_ref.update({
+                'tempo_totale_sec': tot_tempo,
+                'operazioni_totali': tot_ops,
+                'tempo_medio_globale': tot_tempo / tot_ops,
+                'errori_totali': tot_err,
+                f'count_{tipo_operazione}': tipo_count,
+                f'tempo_medio_{tipo_operazione}': tipo_tempo / tipo_count,
+                f'tempo_{tipo_operazione}': tipo_tempo
+            })
+        else:
+            stats_ref.set({
+                'data': oggi,
+                'tempo_totale_sec': tempo_sec,
+                'operazioni_totali': 1,
+                'tempo_medio_globale': tempo_sec,
+                'errori_totali': errori,
+                f'count_{tipo_operazione}': 1,
+                f'tempo_medio_{tipo_operazione}': tempo_sec,
+                f'tempo_{tipo_operazione}': tempo_sec
+            })
+    except Exception as e:
+        print(f"[ERROR] Registrazione statistiche fallita: {e}")

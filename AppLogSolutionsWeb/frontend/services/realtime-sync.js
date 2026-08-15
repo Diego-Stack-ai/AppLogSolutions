@@ -347,7 +347,7 @@ window.updateUser = async function(id, data) {
 }
 
 // Funzione per creare un nuovo utente tramite istanza Auth temporanea
-window.registerNewUserCloud = async function(email, password, nome, cognome, ruolo, turno, canElevate, inRegistroPresenze = false, inPianificazioneViaggi = false) {
+window.registerNewUserCloud = async function(email, password, nome, cognome, ruolo, turno, canElevate, inRegistroPresenze = false, inPianificazioneViaggi = false, aziende_autorizzate = []) {
     const tempApp = getApps().find(a => a.name === "UserCreationApp") || initializeApp(firebaseConfig, "UserCreationApp");
     const tempAuth = getAuth(tempApp);
 
@@ -367,6 +367,7 @@ window.registerNewUserCloud = async function(email, password, nome, cognome, ruo
             canElevate: canElevate,
             inRegistroPresenze: inRegistroPresenze,
             inPianificazioneViaggi: inPianificazioneViaggi,
+            aziende_autorizzate: aziende_autorizzate,
             needsPasswordChange: false,
             createdAt: new Date()
         });
