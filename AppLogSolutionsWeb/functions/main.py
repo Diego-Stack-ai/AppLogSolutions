@@ -102,12 +102,6 @@ sentry_sdk.init(
 
 
 
-DATA_DDT_RE = re.compile(r'del\s+(\d{2})/(\d{2})/(\d{4})', re.I)
-LUOGO_RE = re.compile(r'(?:[Ll]uogo [Dd]i [Dd]estinazione|[Cc]odice [Dd]estinazione):\s*([pP]\d{4,5})')
-CAP_RE = re.compile(r"\b(\d{5})\b")
-PROVINCIA_RE = re.compile(r"\(([A-Z]{2})\)")
-CAUSALE_RE = re.compile(r'(?:conto di|ordine e conto di)\s+([A-Z]\d{4})(?:\s+H(\d{2}))?(?:\s+(\d{3}))?', re.I)
-NUM_DDT_RE = re.compile(r'DDT\s*[Nn][°º\.\s]*([A-Za-z0-9/-]+)', re.I)
 
 
 # --- STORAGE CACHES ---

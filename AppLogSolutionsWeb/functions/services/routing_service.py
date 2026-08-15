@@ -6,13 +6,10 @@ import copy
 from datetime import datetime
 from google.cloud.firestore_v1.base_query import FieldFilter
 from firebase_admin import firestore, storage
-from core.utils import get_db, _safe_float, normalize_code, _genera_url_storage_token, _registra_statistica
+from core.utils import get_db, _safe_float, normalize_code, _genera_url_storage_token, _registra_statistica, _is_primary_code
 
 from services.map_service import _genera_html_mappa, _genera_html_mappa_generale, _genera_kml_zone
 from infrastructure.google_maps_api import _get_directions_data, _get_depot_for_points_cloud
-# To avoid circular import since _is_primary_code is still in main.py? 
-# Wait, _is_primary_code is NOT in main.py, it's in pdf_service.py according to earlier check! Oh, wait, it IS in main.py. Let's just import it from main.
-# Oh, instruction says: from main import is forbidden in routing_service.py!
 
 from firebase_functions import https_fn
 
@@ -1672,12 +1669,4 @@ def core_genera_completo_giornata(data_consegna, tenant="DNR"):
         "tempo_sec": elapsed,
         "giri": zone_totali
     }
-
-def _is_primary_code(text, articoli_noti):
-    if not text: return False
-    text = text.strip().upper()
-    if text in articoli_noti: return True
-    for prefix in articoli_noti:
-        if prefix.endswith('-') and text.startswith(prefix):
-            return True
-    return bool(re.match(r'^([A-Z0-9]{2,}-[A-Z0-9\-]+|--\d{6})', text))
+

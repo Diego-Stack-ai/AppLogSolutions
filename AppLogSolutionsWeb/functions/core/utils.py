@@ -119,3 +119,13 @@ def _registra_statistica(tipo_operazione, tempo_sec, errori=0):
             })
     except Exception as e:
         print(f"[ERROR] Registrazione statistiche fallita: {e}")
+
+def _is_primary_code(text, articoli_noti):
+    if not text: return False
+    text = text.strip().upper()
+    if text in articoli_noti: return True
+    for prefix in articoli_noti:
+        if prefix.endswith('-') and text.startswith(prefix):
+            return True
+    return bool(re.match(r'^([A-Z0-9]{2,}-[A-Z0-9\-]+|--\d{6})', text))
+

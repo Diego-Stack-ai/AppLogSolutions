@@ -8,6 +8,15 @@ from io import BytesIO
 from firebase_admin import firestore, storage
 from firebase_functions import https_fn
 from infrastructure.firebase_setup import get_db, BUCKET_NAME
+from core.utils import clean_client_code, _is_primary_code
+import gc
+
+DATA_DDT_RE = re.compile(r'del\s+(\d{2})/(\d{2})/(\d{4})', re.I)
+LUOGO_RE = re.compile(r'(?:[Ll]uogo [Dd]i [Dd]estinazione|[Cc]odice [Dd]estinazione):\s*([pP]\d{4,5})')
+CAP_RE = re.compile(r"\b(\d{5})\b")
+PROVINCIA_RE = re.compile(r"\(([A-Z]{2})\)")
+CAUSALE_RE = re.compile(r'(?:conto di|ordine e conto di)\s+([A-Z]\d{4})(?:\s+H(\d{2}))?(?:\s+(\d{3}))?', re.I)
+NUM_DDT_RE = re.compile(r'DDT\s*[Nn][°º\.\s]*([A-Za-z0-9/-]+)', re.I)
 def handle_processa_job_pdf(req: https_fn.CallableRequest):
     # Retrieve job_id and tenant from the request payload
     data = req.data
