@@ -22,7 +22,12 @@ from core.utils import (
 )
 
 import os
-_project_id = os.environ.get("GCP_PROJECT", "log-solution-60007")
+_project_id = (
+    os.environ.get("GCLOUD_PROJECT")
+    or os.environ.get("GCP_PROJECT")
+    or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    or PROJECT_ID
+)
 ALLOWED_ORIGINS = [
     f"https://{_project_id}.web.app",
     f"https://{_project_id}.firebaseapp.com",
