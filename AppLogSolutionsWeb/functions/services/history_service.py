@@ -121,3 +121,61 @@ def handle_recupera_viaggio_storico(req: https_fn.CallableRequest, tenant_resolv
 
 
 
+
+
+def handle_ripristina_cache_backup(req: https_fn.CallableRequest):
+    """
+    - azione == 'lista': restituisce l'elenco dei backup disponibili in caches_backup/
+    - azione == 'ripristina': copia il backup selezionato in caches/distanze_reali_cache.json
+    """
+    azione = req.data.get("azione", "lista")
+    target_backup = req.data.get("target_backup")
+    
+    bucket = storage.bucket(name=BUCKET_NAME)
+    global _LOCAL_STORAGE_CACHES, _INITIAL_CACHE_COUNTS
+    
+    if azione == "lista":
+        blobs = bucket.list_blobs(prefix="caches_backup/")
+        backup_list = []
+        for b in blobs:
+            if b.name.endswith(".json"):
+                backup_list.append({
+                    "name": b.name.replace("caches_backup/", ""),
+                    "path": b.name,
+                    "size": b.size,
+                    "updated": b.updated.strftime("%Y-%m-%d %H:%M:%S") if b.updated else ""
+                })
+        # Ordina per nome/data decrescente
+        backup_list.sort(key=lambda x: x["name"], reverse=True)
+        return {"status": "ok", "backups": backup_list}
+        
+    elif azione == "ripristina":
+        if not target_backup:
+            return {"status": "errore", "message": "Nessun backup specificato per il ripristino"}
+            
+        print(f"[CACHE-GUARD] Richiesta ripristino manuale da {target_backup}")
+        try:
+            source_blob = bucket.blob(f"caches_backup/{target_backup}")
+            if not source_blob.exists():
+                return {"status": "errore", "message": f"Il backup {target_backup} non esiste su Storage"}
+                
+            dest_blob = bucket.blob("caches/distanze_reali_cache.json")
+            
+            # Effettua la copia lato storage
+            bucket.copy_blob(source_blob, bucket, dest_blob.name)
+            
+            # Ricarica in memoria il backup ripristinato
+            data_str = dest_blob.download_as_string().decode("utf-8")
+            loaded_data = json.loads(data_str)
+            _LOCAL_STORAGE_CACHES["distanze_reali_cache.json"] = loaded_data
+            _INITIAL_CACHE_COUNTS["distanze_reali_cache.json"] = len(loaded_data)
+            
+            print(f"[CACHE-GUARD] Ripristino completato con successo da {target_backup} ({len(loaded_data)} chiavi)")
+            return {"status": "ok", "message": f"Backup {target_backup} ripristinato con successo ({len(loaded_data)} distanze attive)"}
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {"status": "errore", "message": f"Errore durante il ripristino: {str(e)}"}
+            
+    return {"status": "errore", "message": "Azione non riconosciuta"}
