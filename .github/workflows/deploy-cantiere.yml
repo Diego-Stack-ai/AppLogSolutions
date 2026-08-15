@@ -1,9 +1,7 @@
 name: Deploy to Cantiere (Functions + Hosting)
 
 on:
-  push:
-    branches:
-      - cantiere
+  workflow_dispatch:
 
 jobs:
   deploy-cantiere:
