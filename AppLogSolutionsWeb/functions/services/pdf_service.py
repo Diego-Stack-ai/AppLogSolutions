@@ -7,10 +7,7 @@ import io
 from io import BytesIO
 from firebase_admin import firestore, storage
 from firebase_functions import https_fn
-from infrastructure.firebase_setup import get_db
-
-from firebase_functions import https_fn
-
+from infrastructure.firebase_setup import get_db, BUCKET_NAME
 def handle_processa_job_pdf(req: https_fn.CallableRequest):
     # Retrieve job_id and tenant from the request payload
     data = req.data
