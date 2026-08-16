@@ -18,6 +18,8 @@ def get_tenant_from_viaggio_id(v_id):
 
 def _resolve_tenant_from_source(cliente_zona: str) -> str:
     cz = str(cliente_zona).strip().upper()
+    if not cz:
+        return "DNR"
     if cz in ("FRUTTA", "LATTE"):
         return "DNR"
     if "GRAND_CHEF" in cz or "GRAN_CHEF" in cz or "GRAN CHEF" in cz:
@@ -26,8 +28,8 @@ def _resolve_tenant_from_source(cliente_zona: str) -> str:
         return "CATTEL"
     if "DAC" in cz:
         return "DAC"
-    if cz:
-        return cz
+    
+    print(f"[WARN] Unknown tenant source: '{cz}'. Falling back to DNR.")
     return "DNR"
 
 def handle_genera_report_giornaliero(req: https_fn.CallableRequest):
