@@ -107,7 +107,13 @@ service cloud.firestore {
     // Legacy (mantenute per compatibilita, da rimuovere in futuro)
     match /mappatura/{docId} { allow read, write: if isAuthenticated(); }
     match /articoli/{docId} { allow read, write: if isAuthenticated(); }
-    match /config/{docId} { allow read, write: if isAuthenticated(); }
+    match /config/permessi_dashboard {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
+    match /config/{docId} { 
+      allow read, write: if isAuthenticated() && docId != 'permessi_dashboard'; 
+    }
     match /viaggi/{document=**} { allow read, write: if isAuthenticated(); }
     match /ddt/{docId} { allow read, write: if isAuthenticated(); }
   }
