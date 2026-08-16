@@ -1,5 +1,5 @@
 from infrastructure.firebase_setup import BUCKET_NAME
-from core.utils import _genera_url_storage_token
+from core.utils import _genera_url_storage_token, _build_tripla_chiave
 from firebase_admin import storage, firestore
 from firebase_functions import https_fn
 import typing, io, requests
