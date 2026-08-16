@@ -377,12 +377,12 @@ def genera_completo_giornata(req: https_fn.CallableRequest):
     from services.routing_service import handle_genera_completo_giornata
     return handle_genera_completo_giornata(req)
 
+from core.permissions import require_page_permission
+
 @https_fn.on_call(region="europe-west1", memory=options.MemoryOption.GB_1, timeout_sec=540,
     cors=options.CorsOptions(cors_origins=ALLOWED_ORIGINS, cors_methods=["get", "post"]))
 def processa_job_pdf(req: https_fn.CallableRequest):
-    if not req.auth or not req.auth.uid: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Non autorizzato.")
-    caller_doc = get_db().collection("dipendenti").document(req.auth.uid).get()
-    if not caller_doc.exists or caller_doc.to_dict().get("ruolo") not in {"amministratore", "impiegata"}: raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.PERMISSION_DENIED, message="Negato.")
+    require_page_permission(req, "elaborazione", "write")
     from services.pdf_service import handle_processa_job_pdf
     return handle_processa_job_pdf(req)
 
