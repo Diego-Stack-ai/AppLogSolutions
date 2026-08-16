@@ -5,6 +5,8 @@ from firebase_functions import https_fn
 import typing, io, requests
 from datetime import datetime
 import time
+from collections import defaultdict
+from core.permissions import require_page_permission
 try:
     from pypdf import PdfReader, PdfWriter
 except:
