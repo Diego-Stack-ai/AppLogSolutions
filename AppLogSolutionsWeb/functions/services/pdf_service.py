@@ -860,6 +860,9 @@ def core_processa_job_pdf(job_id, tenant="DNR"):
         split_files = risultato["split_files"]
         deliveries = risultato["deliveries"]
         
+        if not is_excel:
+            data_elab = data_lavoro_forzata or (deliveries[0].get("data") if deliveries else datetime.now().strftime("%d-%m-%Y"))
+            
         deliveries = [
             enrich_delivery_with_canonical_schema(
                 legacy_delivery=delivery,
