@@ -9,23 +9,62 @@ from firebase_admin import firestore, storage
 from core.utils import get_db, _safe_float, normalize_code, _genera_url_storage_token, _registra_statistica, _is_primary_code
 
 from services.map_service import _genera_html_mappa, _genera_html_mappa_generale, _genera_kml_zone
-from infrastructure.google_maps_api import _get_directions_data, _get_depot_for_points_cloud
+from infrastructure.google_maps_api import _get_directions_data, _get_depot_for_points_cloud, _crea_matrice_distanze_cloud, _get_directions_and_simulate_cloud
+from infrastructure.firebase_setup import BUCKET_NAME
+from collections import defaultdict
+import re
 
 from firebase_functions import https_fn
 
+_CACHED_CONSOLIDAMENTO = None
+_CACHE_TIMESTAMP = 0
+_CACHED_ARTICOLI_NOTI = None
+CACHE_TTL = 300
+TIME_PER_STOP_MIN = 8
+CONSOLIDAMENTO = {
+    "LT-ES-04-LS":   ("Fardelli",  "Bottiglie", 10),
+    "LT-AQ-04-LB":   ("Fardelli",  "Bottiglie", 12),
+    "LT-AQ-04-LS":   ("Fardelli",  "Bottiglie", 10),
+    "LT-AQ-04-LV":   ("Fardelli",  "Bottiglie",  6),
+    "LT-ESL-IN-LB":  ("Fardelli",  "Bottiglie",  6),
+    "YO-BI-MN-04-LB":("Cartoni",   "Cluster",   10),
+    "YO-DL-02-LC":   ("Cartoni",   "Porzioni",   6),
+    "AP-SU-PC":      ("Cartoni",   "Porzioni",  24),
+    "FO-DI-GP-01-NI":("Colli",     "Buste",     16),
+    "FO-DI-PV-04-LB":("Colli",     "Fette",     20),
+    "AL-M-BI-L3-NI": ("Colli",     "Porzioni",  10),
+    "SUCCO-REC":     ("Cartoni",   "Porzioni",  24),
+    "PF-T-LI-L3-NA": ("Cartoni",   "Porzioni",   8),
+    "SU-M-BI-L3-NI": ("Cartoni",   "Porzioni",  18),
+    "YO-CN-MN-04-":  ("Cartoni",   "Cluster",   10),
+    "YO-CN-MN-04-LB":("Cartoni",   "Cluster",   10),
+    "AL-T-LI-NA":    ("Cartoni",   "Porzioni",  12),
+    "NE-M-BI-L3-NI": ("Colli",     "Porzioni",  10),
+}
+UNITA_QTY = r"(Confezioni|Confezione|confezioni|confezione|Colli|Collo|colli|collo|Brick|brick|Fardelli|Fardello|fardelli|fardello|Bottiglie|Bottiglia|bottiglie|bottiglia|Cartoni|Cartone|cartoni|cartone|Cluster|cluster|Porzioni|Porzione|porzioni|porzione|Fascette|Fascetta|fascette|fascetta|Manifesti|Manifesto|manifesti|manifesto|Fette|Fetta|fette|fetta|Buste|Busta|buste|busta|pz)"
+
 def handle_ottimizza_viaggio(req: https_fn.CallableRequest):
     viaggio_id = req.data.get("viaggio_id")
-    return core_ottimizza_viaggio(viaggio_id)
+    tenant = req.data.get("tenant")
+    if not tenant:
+        raise ValueError("Tenant esplicito mancante nella richiesta")
+    return core_ottimizza_viaggio(viaggio_id, tenant)
 
 def handle_ricalcola_percorso(req: https_fn.CallableRequest):
     viaggio_id = req.data.get("viaggio_id")
     punti = req.data.get("punti", [])
     num_locked = int(req.data.get("num_locked", 0))
-    return core_ricalcola_percorso(viaggio_id, punti, num_locked)
+    tenant = req.data.get("tenant")
+    if not tenant:
+        raise ValueError("Tenant esplicito mancante nella richiesta")
+    return core_ricalcola_percorso(viaggio_id, punti, num_locked, tenant)
 
 def handle_genera_distinta_viaggio(req: https_fn.CallableRequest):
     viaggio_id = req.data.get("viaggio_id")
-    return core_genera_distinta_viaggio(viaggio_id)
+    tenant = req.data.get("tenant")
+    if not tenant:
+        raise ValueError("Tenant esplicito mancante nella richiesta")
+    return core_genera_distinta_viaggio(viaggio_id, tenant)
 
 def handle_calcola_percorsi_zone(req: https_fn.CallableRequest):
     data_consegna = req.data.get("data_consegna")
@@ -116,9 +155,11 @@ def consolidate_qty(codice, lista_qty, config):
         return "0"
     return " e ".join(res)
 
-def _get_viaggio_doc_self_healing(viaggio_id, tenant=None):
+def _get_viaggio_doc_self_healing(viaggio_id, tenant):
+    if not tenant:
+        raise ValueError("Tenant esplicito mancante. Il routing richiede un tenant valido per operare sui nuovi viaggi.")
     db = get_db()
-    tenant_viaggio = get_tenant_from_viaggio_id(viaggio_id) or tenant or "DNR"
+    tenant_viaggio = tenant
     doc_ref = db.collection('clienti').document(tenant_viaggio).collection('viaggi ddt').document(viaggio_id)
     doc_viaggio = doc_ref.get()
     
@@ -140,7 +181,7 @@ def _get_viaggio_doc_self_healing(viaggio_id, tenant=None):
                 
     return doc_ref, doc_viaggio, tenant_viaggio
 
-def core_ottimizza_viaggio(viaggio_id):
+def core_ottimizza_viaggio(viaggio_id, tenant):
     start_time = time.time()
     print("[INFO] Start ottimizza_viaggio")
 
@@ -148,7 +189,7 @@ def core_ottimizza_viaggio(viaggio_id):
         return {"status": "errore", "message": "viaggio_id mancante", "errori": ["viaggio_id mancante"], "data": {}}
         
         
-    doc_ref, doc_viaggio, tenant_viaggio = _get_viaggio_doc_self_healing(viaggio_id)
+    doc_ref, doc_viaggio, tenant_viaggio = _get_viaggio_doc_self_healing(viaggio_id, tenant)
     if not doc_viaggio.exists:
         return {"status": "errore", "message": "Viaggio non trovato", "errori": ["Viaggio non trovato"], "data": {}}
     viaggio = doc_viaggio.to_dict()
@@ -237,14 +278,14 @@ def core_ottimizza_viaggio(viaggio_id):
         err_msg = f"Errore runtime OR-Tools: {e_opt}"
         return {"status": "errore", "message": "Eccezione OR-Tools", "errori": errori_lista + [err_msg], "data": {}}
 
-def core_genera_distinta_viaggio(viaggio_id):
+def core_genera_distinta_viaggio(viaggio_id, tenant):
     start_time = time.time()
     print("[INFO] Start genera_distinta_viaggio")
     
     if not viaggio_id:
         return {"status": "errore", "message": "viaggio_id mancante", "errori": ["viaggio_id mancante"], "data": {}}
 
-    doc_ref, doc_viaggio, tenant_viaggio = _get_viaggio_doc_self_healing(viaggio_id)
+    doc_ref, doc_viaggio, tenant_viaggio = _get_viaggio_doc_self_healing(viaggio_id, tenant)
     if not doc_viaggio.exists:
         return {"status": "errore", "message": "Viaggio non trovato", "errori": ["Viaggio non trovato"], "data": {}}
     viaggio = doc_viaggio.to_dict()
@@ -386,7 +427,7 @@ def core_genera_distinta_viaggio(viaggio_id):
         }
     }
 
-def core_ricalcola_percorso(viaggio_id, nuovi_punti, num_locked=0):
+def core_ricalcola_percorso(viaggio_id, nuovi_punti, num_locked=0, tenant=None):
     """
     Riceve un viaggio con le tappe riordinate manualmente dal frontend.
     - Le prime `num_locked` tappe sono H10 bloccate (non si toccano).
@@ -398,9 +439,7 @@ def core_ricalcola_percorso(viaggio_id, nuovi_punti, num_locked=0):
     if not viaggio_id or not nuovi_punti:
         return {"status": "errore", "message": "viaggio_id o punti mancanti", "errori": [], "data": {}}
 
-    tenant_viaggio = get_tenant_from_viaggio_id(viaggio_id)
-    doc_ref = get_db().collection('clienti').document(tenant_viaggio).collection('viaggi ddt').document(viaggio_id)
-    doc_viaggio = doc_ref.get()
+    doc_ref, doc_viaggio, tenant_viaggio = _get_viaggio_doc_self_healing(viaggio_id, tenant)
     if not doc_viaggio.exists:
         return {"status": "errore", "message": "Viaggio non trovato", "errori": [], "data": {}}
 
@@ -613,7 +652,9 @@ def _ottimizza_singolo_viaggio_cloud(punti, depot_partenza, depot_arrivo, use_ti
 
     return punti
 
-def core_web_calcola_percorsi(data_consegna, id_zona=None, aggiorna_traffico=False, usa_or_tools=True, tenant="DNR"):
+def core_web_calcola_percorsi(data_consegna, id_zona=None, aggiorna_traffico=False, usa_or_tools=True, tenant=None):
+    if not tenant:
+        raise ValueError("Tenant esplicito mancante nella richiesta per core_web_calcola_percorsi")
     start_time = time.time()
     db = get_db()
     bucket = storage.bucket(name=BUCKET_NAME)
@@ -785,7 +826,9 @@ def core_web_calcola_percorsi(data_consegna, id_zona=None, aggiorna_traffico=Fal
                     if c_latte and c_latte != "p00000":
                         ddt_ids.append(f"{data_consegna}_{c_latte}")
             
-            tenant_viaggio = get_tenant_from_viaggio_id(viaggio_id) or tenant
+            tenant_viaggio = tenant
+            if not tenant_viaggio:
+                raise ValueError("Tenant esplicito mancante. Impossibile calcolare il percorso.")
             doc_ref = db.collection('clienti').document(tenant_viaggio).collection('viaggi ddt').document(viaggio_id)
             
             # Preserva lo stato esistente (es. se è già completato/stampato) e i link
@@ -1365,7 +1408,7 @@ def _genera_distinta_pdf_cloud(viaggio, articoli_viaggio, data_ddt, pdf_ddt_stre
         try: os.unlink(tmp_path)
         except: pass
 
-def core_genera_completo_giornata(data_consegna, tenant="DNR"):
+def core_genera_completo_giornata(data_consegna, tenant=None):
     if not tenant or not isinstance(tenant, str):
         raise ValueError("Tenant mancante o non valido in core_genera_completo_giornata")
     start_time = time.time()
@@ -1497,7 +1540,9 @@ def core_genera_completo_giornata(data_consegna, tenant="DNR"):
         full_stream, light_stream = _genera_distinta_pdf_cloud(zone, articoli_viaggio, data_consegna, pdf_ddt_streams, rientri_giro, pdf_non_trovati_giro)
         
         viaggio_id = f"{data_consegna}_{zid}"
-        tenant_viaggio = get_tenant_from_viaggio_id(viaggio_id) or tenant
+        tenant_viaggio = tenant
+        if not tenant_viaggio:
+            raise ValueError("Tenant esplicito mancante. Impossibile generare la distinta PDF.")
         tenant_folder = tenant_viaggio.upper().replace(" ", "_")
         
         full_blob = bucket.blob(f"{tenant_folder}/REPORTS/{data_consegna}/DISTINTE_VIAGGIO/DISTINTA_{nome_giro}.pdf")
