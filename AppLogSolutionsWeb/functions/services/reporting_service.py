@@ -16,6 +16,20 @@ from infrastructure.firebase_setup import get_db
 def get_tenant_from_viaggio_id(v_id):
     return v_id.split("_")[1] if "_" in v_id else "DNR"
 
+def _resolve_tenant_from_source(cliente_zona: str) -> str:
+    cz = str(cliente_zona).strip().upper()
+    if cz in ("FRUTTA", "LATTE"):
+        return "DNR"
+    if "GRAND_CHEF" in cz or "GRAN_CHEF" in cz or "GRAN CHEF" in cz:
+        return "GRAN CHEF"
+    if "CATTEL" in cz:
+        return "CATTEL"
+    if "DAC" in cz:
+        return "DAC"
+    if cz:
+        return cz
+    return "DNR"
+
 def handle_genera_report_giornaliero(req: https_fn.CallableRequest):
     # Local imports to avoid circular dependency for helpers
     return core_genera_report_giornaliero(req.auth.uid if req.auth else None, req.data.get("data_consegna"), req.data.get("tipologie_da_elaborare", []))
@@ -571,16 +585,14 @@ def core_genera_report_giornaliero(uid, data_consegna, tipologie_da_elaborare=No
     
     tenants_con_viaggi = set()
     for z in master_json:
-        doc_id_z = f"{data_consegna}_{z['id_zona']}"
-        tenant_v = get_tenant_from_viaggio_id(doc_id_z)
+        tenant_v = _resolve_tenant_from_source(z.get('cliente_zona', ''))
         tenants_con_viaggi.add(tenant_v)
         
     for t_v in tenants_con_viaggi:
         # Filtriamo le zone di competenza di questo tenant
         master_json_t = []
         for z in master_json:
-            doc_id_z = f"{data_consegna}_{z['id_zona']}"
-            t_z = get_tenant_from_viaggio_id(doc_id_z)
+            t_z = _resolve_tenant_from_source(z.get('cliente_zona', ''))
             if t_z == t_v:
                 master_json_t.append(z)
                 
@@ -592,7 +604,7 @@ def core_genera_report_giornaliero(uid, data_consegna, tipologie_da_elaborare=No
     # Scrittura su Firestore (Salvataggio Viaggi divisi per Tenant)
     for z in master_json:
         doc_id = f"{data_consegna}_{z['id_zona']}"
-        tenant_viaggio = get_tenant_from_viaggio_id(doc_id)
+        tenant_viaggio = _resolve_tenant_from_source(z.get('cliente_zona', ''))
         viaggio_ref = db.collection('clienti').document(tenant_viaggio).collection('viaggi ddt').document(doc_id)
         
         # Manteniamo t_guida_min, t_tot_min, km_reali, autista se erano presenti nella cassaforte
@@ -601,6 +613,7 @@ def core_genera_report_giornaliero(uid, data_consegna, tipologie_da_elaborare=No
             old_viaggio_data = mappa_zone_esistenti[z["id_zona"]]
             
         viaggio_data = {
+            'tenant': tenant_viaggio,
             'data_lavoro': data_consegna,
             'id_zona': z['id_zona'],
             'nome_giro': z['nome_giro'],
@@ -718,7 +731,7 @@ def handle_genera_riepiloghi_aziendali_light(req: https_fn.CallableRequest) -> t
             path_parts = doc.reference.path.split('/')
             if len(path_parts) >= 2:
                 tenant_di_salvataggio = path_parts[1]
-                real_tenant = get_tenant_from_viaggio_id(v_id)
+                real_tenant = doc.to_dict().get('tenant') or _resolve_tenant_from_source(doc.to_dict().get('cliente_zona', ''))
                 is_correct_path = (tenant_di_salvataggio == real_tenant)
                 
                 if v_id not in viaggi_mappati or is_correct_path:
