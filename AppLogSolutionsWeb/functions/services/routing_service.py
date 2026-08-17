@@ -718,11 +718,16 @@ def core_web_calcola_percorsi(data_consegna, id_zona=None, aggiorna_traffico=Fal
     
     for zone in zone_list:
         zid = zone.get("id_zona")
-        if id_zona:
-            if isinstance(id_zona, list) and zid not in id_zona:
-                continue
-            elif isinstance(id_zona, str) and zid != id_zona:
-                continue
+        if id_zona is not None:
+            norm_zid = str(zid).strip()
+            if isinstance(id_zona, list):
+                norm_targets = [str(x).strip() for x in id_zona]
+                if norm_zid not in norm_targets:
+                    continue
+            else:
+                norm_target = str(id_zona).strip()
+                if norm_zid != norm_target:
+                    continue
         
         if zid in ("DDT_DA_INSERIRE", "PUNTI_DI_CONSEGNA"):
             continue
@@ -930,6 +935,13 @@ def core_web_calcola_percorsi(data_consegna, id_zona=None, aggiorna_traffico=Fal
         print(f"[Ghost Cleanup] Errore durante la pulizia dei viaggi fantasma: {cleanup_err}")
         
     elapsed = time.time() - start_time
+    
+    if not calcolati:
+        return {
+            "status": "errore",
+            "message": "Nessun viaggio selezionato/elaborato per i criteri richiesti."
+        }
+        
     return {
         "status": "ok",
         "message": f"Calcolati percorsi per: {', '.join(calcolati)} in {elapsed:.2f}s",
