@@ -312,8 +312,8 @@ def handle_elimina_giornata_logistica(req: https_fn.CallableRequest):
                 else:
                     if v_cliente_zona in cliente_zona_da_eliminare:
                         should_delete = True
-                    elif ("PROGETTO SCUOLE" in cliente_zona_da_eliminare or "" in cliente_zona_da_eliminare) and (not v_cliente_zona or v_cliente_zona == "PROGETTO SCUOLE"):
-                        # Fallback logico per Frutta/Latte che spesso non hanno cliente_zona o hanno PROGETTO SCUOLE
+                    elif ("DNR" in cliente_zona_da_eliminare or "" in cliente_zona_da_eliminare) and (not v_cliente_zona or v_cliente_zona == "DNR"):
+                        # Fallback logico per Frutta/Latte che spesso non hanno cliente_zona o hanno DNR
                         should_delete = True
                         
                 if should_delete:
@@ -343,7 +343,7 @@ def handle_elimina_giornata_logistica(req: https_fn.CallableRequest):
                     if data.get("data_lavoro") == data_consegna or p.id.startswith(f"{data_consegna}_"):
                         if v_cliente_zona in cliente_zona_da_eliminare:
                             should_delete = True
-                        elif ("PROGETTO SCUOLE" in cliente_zona_da_eliminare or "" in cliente_zona_da_eliminare) and (not v_cliente_zona or v_cliente_zona == "PROGETTO SCUOLE"):
+                        elif ("DNR" in cliente_zona_da_eliminare or "" in cliente_zona_da_eliminare) and (not v_cliente_zona or v_cliente_zona == "DNR"):
                             should_delete = True
                 
                 if should_delete:

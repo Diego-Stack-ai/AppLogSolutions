@@ -18,13 +18,13 @@ def get_tenant_from_viaggio_id(v_id):
 
 def _resolve_tenant_from_source(cliente_zona: str) -> str:
     cz = str(cliente_zona).strip().upper()
-    if cz in ("FRUTTA", "LATTE"):
+    if cz in ("FRUTTA", "LATTE", "DNR_FRUTTA", "DNR_LATTE"):
         return "DNR"
-    if "GRAND_CHEF" in cz or "GRAN_CHEF" in cz or "GRAN CHEF" in cz:
+    if cz in ("GRAND_CHEF", "GRAN_CHEF", "GRAN CHEF"):
         return "GRAN CHEF"
-    if "CATTEL" in cz:
+    if cz == "CATTEL":
         return "CATTEL"
-    if "DAC" in cz:
+    if cz == "DAC":
         return "DAC"
     
     raise ValueError(f"Committente/Tenant non riconosciuto per la sorgente: '{cz}'")
@@ -519,7 +519,7 @@ def core_genera_report_giornaliero(uid, data_consegna, tipologie_da_elaborare=No
         if tenant == "DNR":
             # DNR usa zone geografiche reali, non prefissi file
             nome_giro = zid if zid != "0000" else f"V{idx:02d}"
-            tenant = "PROGETTO SCUOLE" # Fallback visivo richiesto storicamente per DNR
+            tenant = "DNR" # DNR è il tenant canonico e non deve essere sovrascritto
         elif zid.startswith(f"{tenant}_"):
             parts = zid.split('_', 1)
             label = parts[1] if len(parts) > 1 and parts[1] != "0000" else f"{idx:02d}"
