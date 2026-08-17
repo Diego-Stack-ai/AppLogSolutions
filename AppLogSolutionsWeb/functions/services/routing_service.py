@@ -79,8 +79,18 @@ def handle_calcola_percorsi_zone(req: https_fn.CallableRequest):
 
 def handle_web_calcola_percorsi(req: https_fn.CallableRequest):
     data_consegna = req.data.get("data_consegna")
-    zona_id = req.data.get("zona_ids") or req.data.get("target_zones") 
-    return core_web_calcola_percorsi(data_consegna, id_zona=zona_id)
+    zona_id = req.data.get("id_zona") or req.data.get("target_zones") or req.data.get("zona_ids")
+    tenant = req.data.get("tenant")
+    aggiorna_traffico = req.data.get("aggiorna_traffico", False)
+    usa_or_tools = req.data.get("usa_or_tools", True)
+    
+    return core_web_calcola_percorsi(
+        data_consegna, 
+        id_zona=zona_id, 
+        aggiorna_traffico=aggiorna_traffico,
+        usa_or_tools=usa_or_tools,
+        tenant=tenant
+    )
 
 def handle_genera_completo_giornata(req: https_fn.CallableRequest):
     data_consegna = req.data.get("data_consegna")
