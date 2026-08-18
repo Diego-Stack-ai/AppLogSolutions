@@ -206,3 +206,26 @@ Ogni fase deve seguire il ciclo:
 
 Solo al completamento di una fase e relativo test si passa alla successiva.
 Produzione e Muletto: NO TOUCH senza autorizzazione esplicita.
+
+
+
+## GATES AGGIUNTIVI OBBLIGATORI E RICONCILIAZIONE
+
+### RICONCILIAZIONE PRODUZIONE-CANTIERE
+Lo stato della riconciliazione tra PRODUZIONE e CANTIERE è attualmente **SUSPENDED**.
+Sebbene i punti storici (865 vs 866) coincidano, la presunta presenza del tenant `DAC` in PRODUZIONE non è stata confermata da un audit approfondito (DAC FOUND: False nelle collection standard, ma serve ulteriore verifica sui flussi di ingestion/excel). Nessuna promozione può avvenire prima della riconciliazione totale, inclusi i nuovi tenant.
+
+### GATE: GIT_SEPARATION_AUDIT
+Prima di separare i repository, deve essere eseguito un audit Git per mappare remote, branch, GitHub Actions, script di deploy, secrets e riferimenti ai project ID.
+
+### GATE: FIREBASE_DATA_STRUCTURE_REVIEW
+Prima di finalizzare la nuova entità CANTIERE, è obbligatorio rivedere l'intera struttura Firebase attuale.
+- FIRESTORE: root collections, documenti, subcollections, struttura tenant, duplicazioni, legacy vs target.
+- STORAGE: REPORTS, split_ddt, processing, CONSEGNE, backup, ecc.
+- AUTH/RULES/CONFIG: utenti, ruoli, tenant, Firestore Rules, App Check, configurazioni.
+Stato revisione: PENDING.
+
+### PIANO DI CUTOVER
+CANTIERE non verrà rilasciato tramite upgrade in-place. La sostituzione di PRODUZIONE sarà un **CUTOVER TRA DUE APPLICAZIONI** indipendenti. 
+Richiederà un piano contenente data freeze, backup, delta dati, validazione, rollback, smoke test, e reindirizzamento dominio/DNS.
+

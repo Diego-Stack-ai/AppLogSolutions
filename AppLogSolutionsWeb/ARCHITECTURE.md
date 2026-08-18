@@ -473,3 +473,13 @@ L'**Orchestratore Centrale AI** è una componente di evoluzione futura destinata
 * **[`.agent/README.md`](file:///H:/Il%20mio%20Drive/App/AppLogSolutionsWeb/.agent/README.md)**: Indice operativo e guida rapida della documentazione.
 * **[`.agent/workflows/workflow_automazione.md`](file:///H:/Il%20mio%20Drive/App/AppLogSolutionsWeb/.agent/workflows/workflow_automazione.md)**: Dettaglio del motore Python, cache e soft delete.
 * **[`.agent/workflows/Gestione CONSEGNE.md`](file:///H:/Il%20mio%20Drive/App/AppLogSolutionsWeb/.agent/workflows/Gestione%20CONSEGNE.md)**: Integrazione Web/Locale.
+
+
+
+## SEPARAZIONE ARCHITETTURALE PRODUZIONE / CANTIERE
+
+In linea con la decisione di trasformare CANTIERE in una nuova entità applicativa autonoma, l'architettura impone una separazione strutturale totale:
+- **Git Repository**: I repository per l'app legacy (Produzione) e la nuova entità (Cantiere) devono essere divisi, con pipeline e branch distinte.
+- **Firebase Project**: `log-solution-60007` (Produzione) e `log-solutions-cantiere` (Cantiere) sono isolati in modo assoluto. Nessuna Cloud Function del Cantiere può leggere/scrivere la Produzione, salvo tramite script MIGRATION_TOOL/AUDIT_READ_ONLY esplicitamente autorizzati.
+- **Struttura Dati Target**: Cantiere implementa la nuova architettura dati target (es. `tenants/{tenant}/punti_consegna/{id_punto}`). La Produzione manterrà i dati legacy. L'ingestion in Cantiere avverrà tramite esportazione read-only, normalizzazione, validazione e inserimento.
+

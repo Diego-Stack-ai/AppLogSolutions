@@ -109,3 +109,27 @@ Distinzione vincolante tra i 4 livelli del Viaggio:
 1. **Data Lineage Immutabile**: Nessuna operazione di ottimizzazione o spostamento fermata può cancellare il `tenantId` originario o i riferimenti al DDT sorgente.
 2. **Preservazione del Valore Commerciale**: La riorganizzazione dei viaggi operativi da parte di Loge Solution non deve mai alterare il calcolo contabile delle tariffe pattuite con ciascun committente.
 3. **Divieto Fallback DNR**: Se un dato arriva senza `tenantId`, non deve mai essere assegnato automaticamente a DNR, ma bloccato o posto in quarantena (`processing_jobs_quarantine`).
+
+
+
+## TARGET_APPLOGSOLUTIONSWEB: Modello Target dei Punti di Consegna
+
+La vecchia struttura `clienti/{tenant}/raccolta clienti/{documento}` è considerata LEGACY.
+
+Il nuovo percorso target in Firestore è:
+`tenants/{tenant}/punti_consegna/{id_punto}`
+
+### Identità e Anagrafica
+- **id_punto**: ID interno, univoco, immutabile, indipendente dal nome o codice committente (es. DP00123).
+- **Identità esterna**: `tenant`, `canale` (es. FRUTTA/LATTE, o null), `codice_esterno`.
+- **Dati anagrafici**: `cliente`, `indirizzo`, `citta`, `cap` (string), `provincia` (2 caratteri), `lat` (float), `lon` (float).
+- **Note**: Divise in `nota_anagrafica` (stabile) e `nota_consegna` (per singola importazione).
+- *Superamento codici legacy*: `codice_frutta` e `codice_latte` non definiscono l'identità. Un punto FRUTTA e un punto LATTE DNR diventano due schede distinte se hanno logiche/canali separati (anche alla stessa destinazione fisica). P00000 non rappresenta un punto reale.
+
+### Relazioni e Regole Operative
+- **Associazione Punti (`consegna_presso_punto_id`)**: Definisce la consegna fisica presso un'altra entità anagrafica distinta. (Previene cicli o autorelazioni).
+- **Vincolo Associazione (`vincolo_associazione`)**: Se `null`, segue i vincoli del punto fisico; se `RESTRITTIVO`, i vincoli temporali concorrono a determinare la finestra (es. intersezione 08:00-15:00 e 07:30-10:00 -> 08:00-10:00).
+- **Orari**: `orario_min_mattina`, `orario_max_mattina`, `orario_min_pomeriggio`, `orario_max_pomeriggio` (formato HH:MM o null). Sostituiscono gli alias om_frutta/latte.
+- **Configurazione Routing (`modalita_creazione_viaggi`)**: ZONA vs IMPORTAZIONE a livello di tenant (es. DNR -> ZONA).
+- **Geocoding (`stato_geocoding`)**: Auto-geocodificato ma 'da verificare' fino a supervisione umana.
+

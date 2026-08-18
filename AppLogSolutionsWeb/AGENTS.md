@@ -622,3 +622,15 @@ AUTORIZZAZIONE RICHESTA: [ descrivere autorizzazione necessaria ]
 * `firebase deploy --only functions --project log-solution-60007`
 * `firebase deploy --only firestore:rules --project log-solution-60007`
 * `firebase deploy --only storage --project log-solution-60007`
+
+
+## REGOLA OBBLIGATORIA: DISTINZIONE AMBIENTI E BRANCH
+
+Tutti gli agenti operativi e di refactoring DEVONO distinguere rigorosamente i concetti di Branch Git dai Progetti Firebase. 
+
+1. **PRODUZIONE (log-solution-60007)**: È l'ambiente di produzione legacy. Read-only. Congelato.
+2. **CANTIERE (log-solutions-cantiere)**: È la nuova entità applicativa in costruzione, totalmente indipendente.
+3. **SVILUPPO**: Altro ambiente separato, non sinonimo di Cantiere.
+4. **TARGET_APPLOGSOLUTIONSWEB**: Il modello di architettura definitiva documentato.
+5. **Git Branch (`cantiere` vs `main` ecc.)**: Non implica automaticamente il progetto Firebase sottostante. L'agente deve sempre validare separatamente `GIT_BRANCH` e `FIREBASE_PROJECT` prima di intraprendere operazioni tecniche o modifiche di codice. 
+

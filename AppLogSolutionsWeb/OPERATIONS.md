@@ -81,3 +81,17 @@ In caso di guasto catastrofico o corruzione dati:
 * **Rollback Frontend**: Ripristino file dal commit stabile (`git checkout <commit_sha> -- frontend/`), nuovo commit di rollback e deploy `firebase deploy --only hosting --project <PROJECT_ID>`.
 * **Rollback Cloud Functions**: Ripristino dell'intera directory `functions/` dal commit stabile, nuovo commit e deploy `firebase deploy --only functions --project <PROJECT_ID>`.
 * **Rollback Rules**: Deploy separato `firebase deploy --only firestore:rules --project <PROJECT_ID>` o `storage`.
+
+
+
+## PROCEDURE DI FREEZE E CUTOVER (PRODUZIONE E CANTIERE)
+
+### PRODUCTION FREEZE
+È attivo il **PRODUCTION_FREEZE**: non sono permesse modifiche strutturali o nuove funzionalità sull'app di Produzione (`log-solution-60007`). Sono concessi unicamente hotfix operativi urgenti, etichettati come `PRODUCTION_HOTFIX`. Tutte le nuove evoluzioni architetturali sono destinate a CANTIERE.
+
+### REQUISITO DI AUTONOMIA
+Prima del rilascio, il CANTIERE deve dimostrare la completa autonomia (CANTIERE MUST WORK STANDALONE). Tutte le 30 macro-funzionalità logistico-operative (auth, ingestion, routing, or-tools, distinte, mappe, ecc.) devono funzionare senza alcuna dipendenza (né di API, né di dati real-time) dalla Produzione.
+
+### CUTOVER PLAN
+Il passaggio finale non sarà un aggiornamento del codice di Produzione, bensì un Cutover architetturale. Il piano di cutover dovrà prevedere: data freeze, migrazione delta dati anagrafici, validazione di integrità, allineamento di dominio/DNS ed un robusto piano di rollback. Fino all'esecuzione del Cutover, Produzione e Cantiere procedono come entità separate.
+
