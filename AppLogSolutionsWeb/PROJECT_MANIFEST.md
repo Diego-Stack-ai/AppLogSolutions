@@ -629,10 +629,15 @@ Qualsiasi proposta di modifica, nuova schermata o componente tecnico che introdu
 - **PRODUZIONE (log-solution-60007)**: Ruolo strategico: LEGACY_OPERATIONAL_FROZEN. È l'app legacy operativa attuale, congelata rispetto al refactoring. Serve come fonte read-only di dati/confronto.
 - **CANTIERE (log-solutions-cantiere)**: Ruolo strategico: NEW_INDEPENDENT_APPLICATION_ENTITY. È la nuova entità applicativa autonoma, con proprio modello dati, repository, pipeline e struttura Firebase. "CANTIERE MUST WORK STANDALONE".
 - **SVILUPPO**: Ruolo strategico: SEPARATE_APPLICATION_ENVIRONMENT. Ambiente distinto da Produzione e Cantiere.
-- **TARGET_APPLOGSOLUTIONSWEB**: L'architettura definitiva progettata, verso la quale CANTIERE deve convergere.
+- **TARGET_LOGIDESK**: L'architettura definitiva progettata, verso la quale CANTIERE deve convergere.
 
 ### 37.2 Strategia di Separazione e Cutover
 Viene istituito un **PRODUCTION_FREEZE** (nessuna modifica strutturale alla produzione, salvo hotfix autorizzati).
 CANTIERE e PRODUZIONE dovranno avere **repository Git separati** e **progetti Firebase completamente separati** (Firestore, Storage, Auth, Functions, Rules, Hosting).
 La futura sostituzione non sarà un deploy sopra l'esistente, ma un **CUTOVER_PLAN** formalizzato tra due applicazioni distinte.
 
+
+
+## AGGIORNAMENTO LOGIDESK
+- PRODUCT_NAME = LogiDesk
+- TARGET_REPOSITORY = LogiDesk

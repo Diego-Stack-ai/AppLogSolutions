@@ -96,6 +96,9 @@ onAuthStateChanged(auth, async (user) => {
         // Se il profilo è già caricato per questo utente, non rieseguire tutto il ciclo
         if (profileAlreadyLoaded && window.appData?.currentUser?.id === user.uid) {
             console.log("Auth Listener: Profilo già caricato per questo utente, salto ri-inizializzazione.");
+            if (isPublicPage) {
+                window.location.replace('dashboard.html');
+            }
             return;
         }
         try {

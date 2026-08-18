@@ -631,6 +631,6 @@ Tutti gli agenti operativi e di refactoring DEVONO distinguere rigorosamente i c
 1. **PRODUZIONE (log-solution-60007)**: È l'ambiente di produzione legacy. Read-only. Congelato.
 2. **CANTIERE (log-solutions-cantiere)**: È la nuova entità applicativa in costruzione, totalmente indipendente.
 3. **SVILUPPO**: Altro ambiente separato, non sinonimo di Cantiere.
-4. **TARGET_APPLOGSOLUTIONSWEB**: Il modello di architettura definitiva documentato.
+4. **TARGET_LOGIDESK**: Il modello di architettura definitiva documentato.
 5. **Git Branch (`cantiere` vs `main` ecc.)**: Non implica automaticamente il progetto Firebase sottostante. L'agente deve sempre validare separatamente `GIT_BRANCH` e `FIREBASE_PROJECT` prima di intraprendere operazioni tecniche o modifiche di codice. 
 

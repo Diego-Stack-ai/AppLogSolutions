@@ -112,7 +112,7 @@ Distinzione vincolante tra i 4 livelli del Viaggio:
 
 
 
-## TARGET_APPLOGSOLUTIONSWEB: Modello Target dei Punti di Consegna
+## TARGET_LOGIDESK: Modello Target dei Punti di Consegna
 
 La vecchia struttura `clienti/{tenant}/raccolta clienti/{documento}` è considerata LEGACY.
 
