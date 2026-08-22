@@ -6,8 +6,8 @@ const firebaseConfigProd = {
   authDomain: "log-solution-60007.web.app",
   projectId: "log-solution-60007",
   storageBucket: "log-solution-60007.firebasestorage.app",
-  messagingSenderId: "343696844738",
-  appId: "1:343696844738:web:b8d4e10c71fb2c67bc7d20"
+  messagingSenderId: "74169420428",
+  appId: "1:74169420428:web:630250640b42d4a49049a9"
 };
 
 const firebaseConfigDev = {
