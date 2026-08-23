@@ -25,10 +25,7 @@ def get_dynamic_project_id():
 
 PROJECT_ID = get_dynamic_project_id()
 
-if PROJECT_ID == "log-solutions-cantiere":
-    BUCKET_NAME = "log-solutions-cantiere.firebasestorage.app"
-else:
-    BUCKET_NAME = f"{PROJECT_ID}.firebasestorage.app"
+BUCKET_NAME = f"{PROJECT_ID}.firebasestorage.app"
 
 def get_db():
     return firestore.client()
@@ -131,3 +128,4 @@ def save_storage_cache(filename):
             
     except Exception as e:
         print(f"[CACHE] Errore save {filename}: {e}")
+

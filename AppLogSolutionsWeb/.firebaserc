@@ -1,6 +1,5 @@
 {
   "projects": {
-    "default": "log-solution-60007",
-    "cantiere": "log-solutions-cantiere"
+    "default": "log-solution-60007"
   }
 }

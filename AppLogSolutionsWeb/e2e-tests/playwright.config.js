@@ -21,7 +21,7 @@ module.exports = defineConfig({
     ['html', { open: 'never' }]
   ],
   use: {
-    baseURL: 'https://log-solutions-sviluppo.web.app',
+    baseURL: 'https://log-solution-60007.web.app',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'off',
