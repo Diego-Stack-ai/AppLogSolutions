@@ -1,0 +1,2547 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fatturazione - Log Solution</title>
+    <link rel="stylesheet" href="styles.css?v=6.407">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <meta name="theme-color" content="#4f46e5">
+    <style>
+        .custom-tooltip {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            bottom: calc(100% + 5px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: pre;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3), 0 4px 6px -4px rgba(0,0,0,0.2);
+            text-align: left;
+            pointer-events: none;
+            border: 1px solid #334155;
+            line-height: 1.4;
+        }
+        .custom-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px;
+            border-style: solid;
+            border-color: #1e293b transparent transparent transparent;
+        }
+        .excel-note {
+            position: relative;
+            cursor: help;
+        }
+        .excel-note::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            border-width: 0 8px 8px 0;
+            border-style: solid;
+            border-color: transparent #dc2626 transparent transparent;
+        }
+        .excel-note:hover .custom-tooltip {
+            display: block;
+        }
+        /* Primo-terzo livello di righe tbody: orientamento verso il basso */
+        .pivot-table tbody tr:nth-child(-n+3) .custom-tooltip {
+            bottom: auto;
+            top: calc(100% + 5px);
+        }
+        .pivot-table tbody tr:nth-child(-n+3) .custom-tooltip::after {
+            top: auto;
+            bottom: 100%;
+            border-color: transparent transparent #1e293b transparent;
+        }
+        /* Garantisce che i popup di SweetAlert stiano sempre sopra tutto (inclusi i tooltip) */
+        .swal2-container {
+            z-index: 999999 !important;
+        }
+    </style>
+</head>
+<body>
+        <nav class="glass-nav">
+        <div class="nav-content">
+            <img src="img/logo.png" alt="LS" style="height: 32px; width: auto; margin-right: 8px;">
+            <button id="dashboardBtn" class="logout-btn" title="Dashboard"
+                onclick="window.navigateWithState('dashboard.html')"
+                style="border:none; background:none; cursor:pointer; margin-right:8px; display:flex;">
+                <span class="material-icons-round">dashboard</span>
+            </button>
+            <div class="nav-title" style="flex: 1;">Fatturazione Mensile</div>
+            <button class="glass-btn" onclick="window.navigateWithState('fatturazione_clienti.html')" style="margin-right: 12px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 8px; color: var(--primary); border: 1.5px solid var(--primary); cursor: pointer; background: white; outline: none; transition: all 0.2s;">
+                <span class="material-icons-round" style="font-size: 18px; vertical-align: middle;">people</span> Fatturazione Clienti
+            </button>
+            <a href="#" onclick="window.logoutFirebase(); return false;" class="logout-btn" title="Esci"><span class="material-icons-round">logout</span></a>
+        </div>
+    </nav>
+
+    <main class="main-container fatturazione-container">
+        <div class="filters-container">
+            <div class="input-group">
+                <label>Mese di Riferimento</label>
+                <input type="month" id="month-selector" class="file-input">
+            </div>
+            <div class="input-group">
+                <label>Seleziona Cliente</label>
+                <select id="client-selector" class="file-input">
+                    <option value="TUTTI">Tutti i Clienti (Solo Riepilogo)</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="btn-calcola" onclick="if(window.elaboraDati) window.elaboraDati(); else alert('Attendere il caricamento...');">
+                    <span class="material-icons-round" style="margin-right: 8px;">calculate</span>
+                    Elabora Dati
+                </button>
+                <button class="btn btn-primary" id="btn-elabora-presenze" onclick="if(window.elaboraDatiDaPresenze) window.elaboraDatiDaPresenze(); else alert('Attendere il caricamento...');" style="background-color: #10b981; border-color: #10b981; color: white;">
+                    <span class="material-icons-round" style="margin-right: 8px;">calculate</span>
+                    Elabora Dati (Presenze)
+                </button>
+                <button class="btn btn-primary" id="btn-riepilogo-presenze" onclick="if(window.apriRiepilogoPresenze) window.apriRiepilogoPresenze(); else alert('Attendere il caricamento dei moduli...');" style="background-color: #8b5cf6; border-color: #8b5cf6; color: white;">
+                    <span class="material-icons-round" style="margin-right: 8px;">assessment</span>
+                    Riepilogo Presenze
+                </button>
+            </div>
+            <div style="flex-basis: 100%; height: 0; margin: 0; padding: 0;"></div>
+            
+            <div class="action-group" id="cattel-upload-group" style="display: none; margin-top: 10px;">
+                <button class="btn btn-primary" id="btn-download-cattel" style="background-color: #f59e0b; border-color: #f59e0b;">
+                    <span class="material-icons-round" style="margin-right: 8px;">cloud_download</span>
+                    Scarica Dati InTime
+                </button>
+                <input type="file" id="cattel-file-upload" accept=".xlsx" style="display: none;">
+                <button class="btn btn-primary" id="btn-import-cattel" style="background-color: #0ea5e9; border-color: #0ea5e9;">
+                    <span class="material-icons-round" style="margin-right: 8px;">upload_file</span>
+                    Carica KPI Cattel
+                </button>
+            </div>
+            
+            <div class="export-actions" id="export-actions" style="display: none; margin-top: 10px;">
+                <button class="btn btn-primary" onclick="esportaExcel()">
+                    <span class="material-icons-round" style="color: #16a34a; margin-right: 8px;">table_view</span>
+                    Esporta Excel
+                </button>
+                <button class="btn btn-primary" id="btn-export-standard" onclick="esportaModuloStandardExcel()" style="display: none; background-color: #0ea5e9; border-color: #0ea5e9;">
+                    <span class="material-icons-round" style="color: white; margin-right: 8px;">download</span>
+                    Scarica Modulo Standard
+                </button>
+                <button class="btn btn-primary" onclick="esportaPDF()">
+                    <span class="material-icons-round" style="color: #dc2626; margin-right: 8px;">picture_as_pdf</span>
+                    Esporta PDF
+                </button>
+                <button class="btn btn-primary" onclick="openEmailPopup()" style="background-color: #6366f1; border-color: #6366f1; color: white;">
+                    <span class="material-icons-round" style="color: white; margin-right: 8px;">email</span>
+                    Invia per E-mail
+                </button>
+            </div>
+        </div>
+
+        <!-- RECAP CARDS FOR "TUTTI" -->
+        <div id="summary-container" style="display: none;">
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h3>Gran Chef</h3>
+                    <div class="big-number" id="gc-count">0</div>
+                    <div class="money">Tot: €<span id="gc-money">0.00</span></div>
+                </div>
+                <div class="summary-card cattel">
+                    <h3>Cattel</h3>
+                    <div class="big-number" id="cat-count">0</div>
+                    <div class="money">Tot: €<span id="cat-money">0.00</span></div>
+                </div>
+                <div class="summary-card bauer">
+                    <h3>Bauer</h3>
+                    <div class="big-number" id="bau-count">0</div>
+                    <div class="money">Tot: €<span id="bau-money">0.00</span></div>
+                </div>
+                <div class="summary-card" style="border-left: 4px solid #10b981;">
+                    <h3>DNR</h3>
+                    <div class="big-number" id="dnr-count">0</div>
+                    <div class="money">Tot: €<span id="dnr-money">0.00</span></div>
+                </div>
+            </div>
+            <div style="text-align: right; margin-top: 16px;">
+                <h2 style="margin: 0; color: var(--primary);">FATTURATO TOTALE: €<span id="total-money">0.00</span></h2>
+            </div>
+        </div>
+
+        <!-- PIVOT TABLE FOR SPECIFIC CLIENT -->
+        <div id="pivot-container" style="display: none;">
+            <h3 id="pivot-title" style="margin-bottom: 16px; color: var(--text-main);"></h3>
+            <div class="pivot-wrapper">
+                <table class="pivot-table" id="pivot-table">
+                    <thead id="pivot-thead"></thead>
+                    <tbody id="pivot-tbody"></tbody>
+                    <tfoot id="pivot-tfoot"></tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- MODULO FATTURAZIONE STANDARD UNIVERSALE -->
+        <div id="standard-summary-container" style="display: none; margin-top: 32px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="margin: 0; color: var(--text-main);">Fatturazione <span id="standard-summary-client-name"></span> - <span id="standard-summary-month"></span></h3>
+                
+                <!-- TOGGLES DI VISUALIZZAZIONE -->
+                <div style="display: flex; gap: 16px; background: #f8fafc; padding: 10px 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; font-weight: 600; color: #475569; user-select: none;">
+                        <input type="checkbox" id="toggle-colli" checked style="width: 16px; height: 16px; cursor: pointer;" onchange="window.toggleStandardColumns()">
+                        Mostra Dettaglio Colli
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; font-weight: 600; color: #475569; user-select: none;">
+                        <input type="checkbox" id="toggle-totale-gg" checked style="width: 16px; height: 16px; cursor: pointer;" onchange="window.toggleStandardColumns()">
+                        Mostra Totale Lordo Giornaliero
+                    </label>
+                </div>
+            </div>
+
+            <div class="pivot-wrapper">
+                <table class="pivot-table" id="standard-summary-table">
+                    <thead>
+                        <tr id="standard-summary-thead-tr">
+                            <!-- Popolato da JS -->
+                        </tr>
+                    </thead>
+                    <tbody id="standard-summary-tbody"></tbody>
+                    <tfoot id="standard-summary-tfoot"></tfoot>
+                </table>
+            </div>
+            
+            <div id="standard-recap-container" style="margin-top: 24px; max-width: 500px;">
+                <h4 style="color: var(--text-main); margin-bottom: 12px;">Riepilogo Dati</h4>
+                <table class="pivot-table" id="standard-recap-table">
+                    <thead>
+                        <tr>
+                            <th>VOCE</th>
+                            <th>TARIFFA</th>
+                            <th>QUANTITA'</th>
+                            <th>IMPORTO</th>
+                        </tr>
+                    </thead>
+                    <tbody id="standard-recap-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- MODALE RIEPILOGO PRESENZE -->
+        <div id="presenzeModal" class="modal-overlay">
+            <div class="modal-content" style="max-width: 900px; width: 95%;">
+                <h3 style="margin-bottom: 20px; font-size: 18px; color: var(--primary);">Riepilogo Presenze <span id="presenzeModalMese"></span></h3>
+                
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label style="font-size:11px; font-weight:bold; color:var(--primary); text-transform:uppercase;">Raggruppa per:</label>
+                    <select id="presenzeGroupSelect" class="file-input" onchange="renderPresenzeTable()">
+                        <option value="autista">Autista</option>
+                        <option value="data">Data</option>
+                        <option value="cliente">Cliente</option>
+                    </select>
+                </div>
+
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="data-table" id="presenzeTable">
+                        <thead>
+                            <tr>
+                                <th id="presenzeColonnaGruppo">Autista</th>
+                                <th>Turni / Record</th>
+                                <th>Ore Ord.</th>
+                                <th>Ore Stra.</th>
+                                <th>Ore Tot.</th>
+                                <th>Navette Extra</th>
+                                <th>Navette Pure</th>
+                            </tr>
+                        </thead>
+                        <tbody id="presenzeTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('presenzeModal').classList.remove('active')">Chiudi</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Popup / Modal Invio E-mail -->
+        <div id="emailModal" class="modal-overlay">
+            <div class="modal-content" style="max-width: 550px; width: 90%;">
+                <h3 style="margin-bottom: 20px;">Invia Documento di Fatturazione</h3>
+                <form id="emailForm" style="display: grid; gap: 15px;">
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <label style="font-size:11px; font-weight:bold; color:var(--primary); text-transform:uppercase;">Destinatario (E-mail Cliente)</label>
+                        <input type="email" id="emailDestinatario" style="padding:10px; border-radius:8px; border:1px solid #cbd5e1; font-size:14px;" placeholder="amministrazione@cliente.it">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <label style="font-size:11px; font-weight:bold; color:var(--primary); text-transform:uppercase;">Oggetto Email</label>
+                        <input type="text" id="emailOggetto" style="padding:10px; border-radius:8px; border:1px solid #cbd5e1; font-size:14px;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <label style="font-size:11px; font-weight:bold; color:var(--primary); text-transform:uppercase;">Seleziona Allegati</label>
+                        <div style="display:flex; gap:20px; font-size:13px; margin-top:5px;">
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;">
+                                <input type="checkbox" id="attachPdf" checked style="width:16px; height:16px;"> PDF (.pdf)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;">
+                                <input type="checkbox" id="attachExcel" style="width:16px; height:16px;"> Excel (.xlsx)
+                            </label>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <label style="font-size:11px; font-weight:bold; color:var(--primary); text-transform:uppercase;">Corpo del Messaggio</label>
+                        <textarea id="emailCorpo" rows="5" style="padding:10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; font-family:inherit; resize:vertical;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button type="submit" class="btn-primary" style="flex: 2;">Spedisci Email</button>
+                        <button type="button" onclick="closeEmailModal()" class="btn-primary" style="flex: 1; background: #f1f5f9; color: #64748b; box-shadow: none;">Annulla</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script src="script.js?v=6.407"></script>
+    <script type="module" src="firebase-auth-sync.js?v=6.407"></script>
+
+    <!-- Script sincrono: imposta data e listener UI SENZA aspettare Firebase -->
+    <script>
+        (function() {
+            // Imposta mese corrente
+            var now = new Date();
+            var y = now.getFullYear();
+            var mo = String(now.getMonth() + 1).padStart(2, '0');
+            document.getElementById('month-selector').value = y + '-' + mo;
+
+            // Gestisce visibilità bottoni Cattel - esposta globalmente per uso dal modulo
+            window.updateExtraButtons = function() {
+                var val = document.getElementById('client-selector').value;
+                var cattelGroup = document.getElementById('cattel-upload-group');
+                if (cattelGroup) {
+                    cattelGroup.style.display = (val === 'CATTEL') ? 'flex' : 'none';
+                }
+            };
+            document.getElementById('client-selector').addEventListener('change', window.updateExtraButtons);
+            // Chiamata immediata (ripristino browser)
+            window.updateExtraButtons();
+
+            // Il gestore per btn-download-cattel è stato spostato nel blocco modulo Firestore per poter usare il db.
+
+            // Carica KPI - apre dialog file
+            document.getElementById('btn-import-cattel').addEventListener('click', function() {
+                document.getElementById('cattel-file-upload').click();
+            });
+            // Btn Elabora: delegato a window.elaboraDati che viene registrata dal modulo
+            document.getElementById('btn-calcola').addEventListener('click', function() {
+                if (window.elaboraDati) {
+                    window.elaboraDati();
+                } else {
+                    Swal.fire('Attendere', 'Il database non è ancora pronto. Riprovare tra qualche secondo.', 'warning');
+                }
+            });
+        })();
+    </script>
+
+    <script type="module">
+        import { db, app } from "./core/firebase-init.js";
+        import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, getDoc, setDoc, addDoc, writeBatch, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { firebaseConfig } from "./firebase-config.js";
+
+
+        // Popolamento dinamico clienti da Firestore
+        async function popolaClientiFatturazione() {
+            try {
+                const sel = document.getElementById('client-selector');
+                const val = sel.value;
+                const snap = await window.getDocsConFallback(collection(db, "progetti"));
+                if (!snap.empty) {
+                    sel.innerHTML = '<option value="TUTTI">Tutti i Clienti (Solo Riepilogo)</option>';
+                    snap.docs.forEach(docSnap => {
+                        const d = docSnap.data();
+                        if (!d.nome) return;
+                        const opt = document.createElement('option');
+                        opt.value = d.nome;
+                        opt.textContent = d.nome;
+                        sel.appendChild(opt);
+                    });
+                    if (val && [...sel.options].some(o => o.value === val)) {
+                        sel.value = val;
+                    }
+                    if (typeof window.updateExtraButtons === 'function') window.updateExtraButtons();
+                }
+            } catch(e) { console.error("Errore popolamento clienti:", e); }
+        }
+        popolaClientiFatturazione();
+
+        window.mostraPopupCattel = async () => {
+            let username = "cattel.somma";
+            let password = "HuhN28ci";
+            let loginUrl = "https://intime.lac-consulting.eu/webClient/login.xhtml";
+            
+            try {
+                const { getDocs, collection, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const q = query(collection(db, "progetti"), where("nome", "==", "CATTEL"));
+                const snap = await window.getDocsConFallback(q);
+                if (!snap.empty) {
+                    const d = snap.docs[0].data();
+                    if (d.cattel_username) username = d.cattel_username;
+                    if (d.cattel_password) password = d.cattel_password;
+                    if (d.cattel_url) loginUrl = d.cattel_url;
+                }
+            } catch (err) {
+                console.warn("Impossibile caricare credenziali da progetti Firestore:", err);
+            }
+
+            Swal.fire({
+                title: 'Credenziali Portale CATTEL',
+                html: `
+                    <div style="text-align: left; background: #f8f9fa; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; font-family: 'Outfit', sans-serif;">
+                        <div style="margin-bottom: 12px;">
+                            <label style="font-weight: 700; font-size: 13px; color: #475569; display: block; margin-bottom: 4px;">USERNAME</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input id="swal-username" type="text" class="swal2-input" value="${username}" readonly style="margin: 0; flex: 1; height: 38px; font-size: 14px; font-family: monospace; background-color: #e2e8f0; cursor: not-allowed;">
+                                <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('swal-username').value); Swal.showValidationMessage('Username copiato!'); setTimeout(()=>Swal.resetValidationMessage(), 1500);" style="background: #10b981; color: white; border: none; padding: 0 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center;"><span class="material-icons-round" style="font-size: 18px; color: white !important;">content_copy</span></button>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 16px;">
+                            <label style="font-weight: 700; font-size: 13px; color: #475569; display: block; margin-bottom: 4px;">PASSWORD</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input id="swal-password" type="text" class="swal2-input" value="${password}" readonly style="margin: 0; flex: 1; height: 38px; font-size: 14px; font-family: monospace; background-color: #e2e8f0; cursor: not-allowed;">
+                                <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('swal-password').value); Swal.showValidationMessage('Password copiata!'); setTimeout(()=>Swal.resetValidationMessage(), 1500);" style="background: #10b981; color: white; border: none; padding: 0 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center;"><span class="material-icons-round" style="font-size: 18px; color: white !important;">content_copy</span></button>
+                            </div>
+                        </div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 8px; line-height: 1.4;">
+                            💡 Per modificare queste credenziali, vai in <b>Impostazioni Sistema ➔ Gestione Clienti & Viaggi ➔ CATTEL</b>.
+                        </div>
+                    </div>
+                `,
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonText: '<span class="material-icons-round" style="vertical-align: middle; font-size:18px; margin-right:4px; color: white !important;">open_in_new</span> Vai al Portale',
+                cancelButtonText: 'Chiudi',
+                confirmButtonColor: '#0ea5e9',
+                cancelButtonColor: '#64748b'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.open(loginUrl, '_blank');
+                }
+            });
+        };
+
+        document.getElementById('btn-download-cattel').addEventListener('click', () => {
+            window.mostraPopupCattel();
+        });
+
+        // Utils for date parsing
+        function getDayFromDateString(dateStr) {
+            let mm = dateStr.match(/(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+            if (mm) return parseInt(mm[1], 10);
+            mm = dateStr.match(/(\d{4})[-\/](\d{2})[-\/](\d{2})/);
+            if (mm) return parseInt(mm[3], 10);
+            return null;
+        }
+        window.getDayFromDateString = getDayFromDateString;
+
+
+
+        document.getElementById('cattel-file-upload').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const monthVal = document.getElementById('month-selector').value;
+            if (!monthVal) {
+                Swal.fire('Errore', 'Seleziona un mese di riferimento prima di caricare il KPI.', 'error');
+                return;
+            }
+
+            Swal.fire({
+                title: 'Elaborazione KPI Cattel...',
+                text: 'Lettura file Excel in corso...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            try {
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                const batch = writeBatch(db);
+                const activeTenant = localStorage.getItem('activeTenant') || 'DNR';
+                const viaggiRef = collection(db, 'clienti', activeTenant, 'viaggi ddt');
+                
+                // --- PULIZIA VECCHI DATI KPI DEL MESE ---
+                const targetSuffix = `-${monthVal.split('-')[1]}-${monthVal.split('-')[0]}`; // es. "-06-2026"
+                const qClean = query(viaggiRef, where("importato_da_kpi", "==", true));
+                const snapClean = await window.getDocsConFallback(qClean);
+                snapClean.forEach(docSnap => {
+                    const d = docSnap.data();
+                    const dDate = d.data_lavoro || d.data || d.data_consegna || '';
+                    if (dDate.includes(targetSuffix) || dDate.startsWith(monthVal)) {
+                        batch.delete(docSnap.ref);
+                    }
+                });
+                
+                let docsAdded = 0;
+
+                jsonData.forEach((row, idx) => {
+                    let rawDate = row['Data'] || row['DATA'] || row['data'];
+                    if (!rawDate) return;
+                    
+                    let dateObj;
+                    if (rawDate instanceof Date) {
+                        dateObj = rawDate;
+                    } else if (typeof rawDate === 'string') {
+                        let parts = rawDate.split('/');
+                        if (parts.length === 3) {
+                            dateObj = new Date(parts[2], parseInt(parts[1])-1, parts[0]);
+                        } else {
+                            dateObj = new Date(rawDate);
+                        }
+                    } else if (typeof rawDate === 'number') {
+                        dateObj = new Date(Math.round((rawDate - 25569)*86400*1000));
+                    }
+                    if (!dateObj || isNaN(dateObj.getTime())) return;
+                    
+                    const yy = dateObj.getFullYear();
+                    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    if (`${yy}-${mm}` !== monthVal) return; 
+
+                    let dStr = String(dateObj.getDate()).padStart(2, '0') + '-' + mm + '-' + yy;
+                    
+                    let autista = String(row['Autista'] || row['AUTISTA'] || '').trim();
+                    let targa = String(row['Codice mezzo'] || row['CODICE MEZZO'] || row['Targa'] || '').trim().toUpperCase();
+                    let zonaRaw = String(row['Zona'] || row['ZONA'] || 'GENERICO').trim();
+                    let quantita = parseFloat(row['Quantità'] || row['QUANTITÀ'] || row['Colli'] || row['COLLI'] || row['colli'] || 0) || 0;
+                    let peso = parseFloat(row['Peso'] || row['PESO'] || row['peso'] || 0) || 0;
+                    let destinazioni = parseInt(row['Destinazioni'] || row['DESTINAZIONI'] || 0) || 0;
+                    let km = parseFloat(row['Km'] || row['KM'] || row['km'] || 0) || 0;
+                    
+                    if (!zonaRaw) zonaRaw = "GENERICO";
+
+                    let noteText = `Importato da KPI`;
+                    if (peso > 0 || km > 0) noteText += ` - Peso: ${peso}kg, Km: ${km}`;
+
+                    const pt = {
+                        zona: zonaRaw,
+                        quantita: quantita,
+                        peso: peso,
+                        km: km,
+                        destinazioni: destinazioni,
+                        note: noteText
+                    };
+
+                    const docRef = doc(viaggiRef);
+                    batch.set(docRef, {
+                        data_lavoro: dStr,
+                        nome_giro: "CATTEL " + zonaRaw,
+                        id_zona: "CATTEL_" + zonaRaw.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase(),
+                        autista: autista,
+                        targa: targa,
+                        targa_mezzo: targa, 
+                        punti: [pt],
+                        is_cattel: true,
+                        importato_da_kpi: true,
+                        timestamp: new Date().toISOString()
+                    });
+                    docsAdded++;
+                });
+
+                if (docsAdded === 0) {
+                    Swal.fire('Attenzione', 'Nessun viaggio CATTEL trovato per il mese selezionato nel file Excel.', 'warning');
+                    return;
+                }
+
+                Swal.fire({
+                    title: 'Salvataggio in corso...',
+                    text: `Trovati ${docsAdded} viaggi. Salvataggio su Firestore...`,
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                await batch.commit();
+                e.target.value = "";
+
+                Swal.fire('Successo', 'Dati KPI importati nello storico correttamente!', 'success').then(() => {
+                    document.getElementById('btn-calcola').click();
+                });
+
+            } catch(err) {
+                console.error(err);
+                Swal.fire('Errore', 'Errore durante l\'importazione: ' + err.message, 'error');
+            }
+        });
+
+        let currentClient = "TUTTI";
+        let currentMonthLabel = "";
+
+        // Registra la funzione come globale così il listener sincrono può chiamarla
+        window.elaboraDati = async function() {
+            const monthVal = document.getElementById('month-selector').value;
+            const clientSel = document.getElementById('client-selector').value;
+            currentClient = clientSel;
+            
+            if (!monthVal) {
+                Swal.fire('Errore', 'Seleziona un mese', 'error');
+                return;
+            }
+
+            const [year, month] = monthVal.split('-');
+            const targetSuffix = `-${month}-${year}`; 
+            
+            const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+            currentMonthLabel = `${monthNames[parseInt(month)-1]} ${year}`;
+
+            window.currentClient = currentClient;
+            window.currentMonthLabel = currentMonthLabel;
+
+            Swal.fire({
+                title: 'Lettura Database...',
+                text: 'Elaborazione viaggi in corso...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            // Recupero Tariffe
+            let TARIFFA_GC = 350.0;
+            let TARIFFA_GC_B = 150.0;
+            let TARIFFA_BAU = 390.0;
+            let CAT_B = 340.0;
+            let CAT_C = 380.0;
+            let CAT_NAV1 = 380.0;
+            let CAT_NAV2 = 480.0;
+            let DNR_DDT = 16.50;
+            let DNR_FORFAIT = 250.00;
+            let CAT_COLLO = 0.0;
+            
+            let CAT_LIMITE_KM_B = 100;
+            let CAT_LIMITE_KM_C = 100;
+            let CAT_LIMITE_PESO_B = 1200;
+            let CAT_LIMITE_PESO_C = 0;
+
+            let configCattel = {
+                limPesoB: CAT_LIMITE_PESO_B,
+                limPesoC: CAT_LIMITE_PESO_C,
+                limKmB: CAT_LIMITE_KM_B,
+                limKmC: CAT_LIMITE_KM_C
+            };
+
+            let clientNavetteMap = {};
+
+            try {
+                // Leggiamo tutto dalla nuova collection "progetti" gestita in impostazioni.html
+                const progSnap = await window.getDocsConFallback(collection(db, "progetti"));
+                progSnap.forEach(docSnap => {
+                    const d = docSnap.data();
+                    const nome = (d.nome || "").toUpperCase();
+                    
+                    if (d.navette_personalizzate && Array.isArray(d.navette_personalizzate)) {
+                        clientNavetteMap[nome] = d.navette_personalizzate;
+                    } else {
+                        // Fallback temporaneo per retrocompatibilità
+                        let fallbackNav = [];
+                        if (d.navetta_sommacampagna) fallbackNav.push({nome: "SOMMACAMPAGNA", tariffa: parseFloat(d.navetta_sommacampagna)});
+                        if (d.navetta_cerea) fallbackNav.push({nome: "BENCARNI", tariffa: parseFloat(d.navetta_cerea)});
+                        if (d.navetta_cerea === undefined && d.navetta_sommacampagna === undefined && d.viaggio_b) fallbackNav.push({nome: "SOMMACAMPAGNA", tariffa: parseFloat(d.viaggio_b)});
+                        clientNavetteMap[nome] = fallbackNav;
+                    }
+                    
+                    if (nome === "CATTEL") {
+                        if (d.patente_b) CAT_B = parseFloat(d.patente_b);
+                        if (d.patente_c) CAT_C = parseFloat(d.patente_c);
+                        if (d.navetta_sommacampagna) CAT_NAV1 = parseFloat(d.navetta_sommacampagna);
+                        if (d.navetta_cerea) CAT_NAV2 = parseFloat(d.navetta_cerea);
+                        if (d.cattel_collo) CAT_COLLO = parseFloat(d.cattel_collo);
+                        
+                        if (d.cattel_lim_km_b !== undefined && d.cattel_lim_km_b !== null) configCattel.limKmB = parseFloat(d.cattel_lim_km_b);
+                        if (d.cattel_lim_km_c !== undefined && d.cattel_lim_km_c !== null) configCattel.limKmC = parseFloat(d.cattel_lim_km_c);
+                        if (d.cattel_lim_peso_b !== undefined && d.cattel_lim_peso_b !== null) configCattel.limPesoB = parseFloat(d.cattel_lim_peso_b);
+                        if (d.cattel_lim_peso_c !== undefined && d.cattel_lim_peso_c !== null) configCattel.limPesoC = parseFloat(d.cattel_lim_peso_c);
+                    } else if (nome === "GRAN CHEF") {
+                        if (d.viaggio_a) TARIFFA_GC = parseFloat(d.viaggio_a);
+                        else if (d.tariffa_viaggio) TARIFFA_GC = parseFloat(d.tariffa_viaggio);
+                        
+                        if (d.viaggio_b) TARIFFA_GC_B = parseFloat(d.viaggio_b);
+                    } else if (nome === "BAUER") {
+                        if (d.viaggio_a) TARIFFA_BAU = parseFloat(d.viaggio_a);
+                        else if (d.tariffa_viaggio) TARIFFA_BAU = parseFloat(d.tariffa_viaggio);
+                    } else if (nome === "DNR" || nome === "PROGETTO SCUOLE") {
+                        if (d.costo_ddt_base) DNR_DDT = parseFloat(d.costo_ddt_base);
+                        else if (d.tariffa_ddt) DNR_DDT = parseFloat(d.tariffa_ddt);
+                        
+                        if (d.viaggio_forfait) DNR_FORFAIT = parseFloat(d.viaggio_forfait);
+                        else if (d.tariffa_forfait) DNR_FORFAIT = parseFloat(d.tariffa_forfait);
+                    }
+                });
+            } catch (errListini) {
+                console.warn("Errore lettura progetti, uso i valori di default");
+            }
+
+            configCattel.TARIFFA_B = CAT_B;
+            configCattel.TARIFFA_C = CAT_C;
+            configCattel.TARIFFA_NAV1 = CAT_NAV1;
+            configCattel.TARIFFA_NAV2 = CAT_NAV2;
+            configCattel.TARIFFA_COLLO = CAT_COLLO;
+
+            try {
+                // Mappa targhe -> patente
+                let mezziMap = {};
+                try {
+                    const mezziSnap = await window.getDocsConFallback(collection(db, "mezzi"));
+                    mezziSnap.forEach(doc => {
+                        const data = doc.data();
+                        if (data.targa) mezziMap[data.targa.toUpperCase()] = data.patente || 'B';
+                    });
+                } catch(e) {}
+
+                // Recuperiamo TUTTI i viaggi
+                const activeTenant = localStorage.getItem('activeTenant') || 'DNR';
+                const viaggiRef = collection(db, 'clienti', activeTenant, 'viaggi ddt');
+                const snap = await window.getDocsConFallback(viaggiRef);
+
+                let trips = [];
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const dataConsegna = d.data_lavoro || d.data || d.data_consegna || '';
+                    if (dataConsegna.includes(targetSuffix) || dataConsegna.startsWith(`${year}-${month}`)) {
+                        trips.push({ id: doc.id, ...d, rawDate: dataConsegna });
+                    }
+                });
+
+                // Per il Riepilogo Totale
+                let countGC = 0, totGC = 0;
+                let countCat = 0, totCat = 0;
+                let countBau = 0, totBau = 0;
+                let countDnr = 0, totDnr = 0;
+
+                function getNavettaInfo(clienteStr, nomeViaggioStr) {
+                    let fallbackTariff = clienteStr === "GRAN CHEF" ? TARIFFA_GC : (clienteStr === "CATTEL" ? CAT_NAV1 : 0);
+                    const navette = clientNavetteMap[clienteStr] || [];
+                    if (navette.length === 0) return { nome: "NAVETTA", tariffa: fallbackTariff };
+                    
+                    let matchedNav = null;
+                    for (let nav of navette) {
+                        if (nav.nome && nomeViaggioStr.toUpperCase().includes(nav.nome.toUpperCase())) {
+                            matchedNav = nav; break;
+                        }
+                    }
+                    if (!matchedNav) matchedNav = navette[0];
+                    
+                    let outNome = matchedNav.nome ? `NAVETTA ${matchedNav.nome}` : "NAVETTA";
+                    return { nome: outNome.toUpperCase(), tariffa: matchedNav.tariffa };
+                }
+
+                // Per la matrice (Pivot)
+                // pivotData: { "NOME GIRO": { day1: importo, day2: importo... } }
+                let pivotData = {};
+
+                for (const t of trips) {
+                    const p = t.punti || t.punti_ottimizzati || [];
+                    const nomeStr = (t.nome_giro || t.id_zona || 'GENERICO').toUpperCase();
+                    
+                    const dbClient = (t.cliente || '').toUpperCase();
+                    let isGC = dbClient === "GRAN CHEF" || dbClient === "GRANCHEF" || t.is_grand_chef === true || t.is_gc === true;
+                    let isCat = dbClient === "CATTEL";
+                    let isBau = dbClient === "BAUER";
+
+                    if (!isGC) {
+                        isGC = p.some(pt => {
+                            const tg = (pt.tipologia_grado || pt.tipo || '').toUpperCase();
+                            const zn = (pt.zona || '').toUpperCase();
+                            return tg.includes("GRAND") || tg.includes("CHEF") || zn.includes("CHEF") || zn.includes("GRANCHEF");
+                        });
+                        if (!isGC && (nomeStr.includes("CHEF") || nomeStr.includes("GRAN"))) isGC = true;
+                    }
+
+                    if (!isCat) {
+                        isCat = p.some(pt => (pt.zona || '').toUpperCase().includes("CATTEL") || (pt.codice_frutta || '').toUpperCase().includes("CATTEL"));
+                        if (!isCat && nomeStr.includes("CATTEL")) isCat = true;
+                    }
+
+                    if (!isBau) {
+                        isBau = p.some(pt => (pt.zona || '').toUpperCase().includes("BAUER") || (pt.codice_frutta || '').toUpperCase().includes("BAUER"));
+                        if (!isBau && nomeStr.includes("BAUER")) isBau = true;
+                    }
+
+                    // Determiniamo il cliente per questo viaggio
+                    let tripClient = "DNR";
+                    if (isGC) tripClient = "GRAN CHEF";
+                    else if (isCat) tripClient = "CATTEL";
+                    else if (isBau) tripClient = "BAUER";
+
+                    let finalNomeStr = nomeStr;
+                    if (tripClient === "CATTEL" && !nomeStr.includes("NAVETTA")) {
+                        let parts = finalNomeStr.split(' ');
+                        let cleaned = parts.map(p => {
+                            let s = p.trim();
+                            if (s.startsWith("SOA")) s = s.substring(3);
+                            s = s.replace(/[0-9]+$/, '');
+                            return s;
+                        }).filter(Boolean).join(' ');
+                        if (cleaned) finalNomeStr = cleaned;
+                    }
+
+                    // Calcolo importo
+                    let importo = 0;
+                    let importo_colli = 0;
+                    if (tripClient === "GRAN CHEF") {
+                        if (nomeStr.includes("VIAGGIO B") || nomeStr.includes("SOMMACAMPAGNA") || nomeStr.includes("NAVETTA")) {
+                            const navInfo = getNavettaInfo("GRAN CHEF", nomeStr);
+                            importo = navInfo.tariffa;
+                            finalNomeStr = navInfo.nome;
+                        } else {
+                            importo = TARIFFA_GC;
+                        }
+                        countGC++; totGC += importo;
+                    } else if (tripClient === "CATTEL") {
+                        if (nomeStr.includes("NAVETTA")) {
+                            const navInfo = getNavettaInfo("CATTEL", nomeStr);
+                            importo = navInfo.tariffa;
+                            finalNomeStr = navInfo.nome;
+                        } else {
+                            const targaStr = (t.targa || t.targa_mezzo || '').toUpperCase();
+                            let patente = mezziMap[targaStr] || 'B';
+                            importo = (patente === 'C') ? CAT_C : CAT_B;
+                            
+                            // Aggiungiamo il calcolo colli solo se non è navetta
+                            let tQ = 0;
+                            p.forEach(pt => {
+                                let pq = parseFloat(pt.quantita);
+                                tQ += isNaN(pq) ? 0 : pq;
+                            });
+                            importo_colli = tQ * CAT_COLLO;
+                        }
+                        let importo_totale = importo + importo_colli;
+                        countCat++; totCat += importo_totale;
+                    } else if (tripClient === "BAUER") {
+                        importo = TARIFFA_BAU;
+                        countBau++; totBau += importo;
+                    } else {
+                        // DNR
+                        if (t.is_forfait === true) {
+                            importo = DNR_FORFAIT;
+                        } else {
+                            let nDDT = p.length;
+                            let countValid = 0;
+                            p.forEach(pt => {
+                                if ((pt.zona || '').toUpperCase() !== 'RIENTRO' && (pt.zona || '').toUpperCase() !== 'PARTENZA') {
+                                    countValid++;
+                                }
+                            });
+                            if (countValid === 0 && nDDT === 0) countValid = 1;
+                            importo = DNR_DDT * countValid;
+                        }
+                        countDnr++; totDnr += importo;
+                    }
+
+                    // Se siamo in modalità singola e il cliente combacia, aggiungiamo alla pivot
+                    if (clientSel !== "TUTTI" && tripClient === clientSel) {
+                        let day = getDayFromDateString(t.rawDate);
+                        if (day) {
+                            let rowKey = finalNomeStr;
+                            
+                            if (tripClient === "CATTEL") {
+                                let attempt = 1;
+                                let currentKey = rowKey;
+                                while (pivotData[currentKey] && pivotData[currentKey][day] !== undefined) {
+                                    attempt++;
+                                    currentKey = `${rowKey} (${attempt})`;
+                                }
+                                
+                                let targaStrVal = (t.targa || t.targa_mezzo || '').toUpperCase();
+                                let nomeStrVal = (t.nome_dipendente || t.dipendente || t.autista || t.padroncino || '').toUpperCase();
+                                let patenteVal = mezziMap[targaStrVal] || 'B';
+                                
+                                if (!pivotData[currentKey]) pivotData[currentKey] = {};
+                                
+                                pivotData[currentKey][day] = {
+                                    importo: importo + importo_colli,
+                                    importo_viaggio: importo,
+                                    importo_colli: importo_colli,
+                                    count: 1,
+                                    quantita: 0,
+                                    peso: 0,
+                                    km: 0,
+                                    targa: targaStrVal,
+                                    nome: nomeStrVal,
+                                    patente: patenteVal
+                                };
+                                
+                                p.forEach(pt => {
+                                    let pq = parseFloat(pt.quantita);
+                                    let pp = parseFloat(pt.peso);
+                                    let pk = parseFloat(pt.km);
+                                    pivotData[currentKey][day].quantita += isNaN(pq) ? 0 : pq;
+                                    pivotData[currentKey][day].peso += isNaN(pp) ? 0 : pp;
+                                    pivotData[currentKey][day].km += isNaN(pk) ? 0 : pk;
+                                });
+                            } else if (tripClient === "GRAN CHEF") {
+                                if (rowKey.includes("VIAGGIO B") || rowKey.includes("SOMMACAMPAGNA") || rowKey.includes("NAVETTA")) {
+                                    rowKey = "NAVETTA SOMMACAMPAGNA";
+                                } else if (rowKey.includes("VIAGGIO A") || rowKey.includes("GRAN CHEF")) {
+                                    rowKey = "VIAGGIO A";
+                                }
+                                if (!pivotData[rowKey]) pivotData[rowKey] = {};
+                                
+                                let targaStrVal = (t.targa || t.targa_mezzo || '').toUpperCase();
+                                let nomeStrVal = (t.nome_dipendente || t.dipendente || t.autista || t.padroncino || '').toUpperCase();
+                                let patenteVal = mezziMap[targaStrVal] || 'B';
+                                
+                                if (pivotData[rowKey][day] === undefined) {
+                                    pivotData[rowKey][day] = {
+                                        importo: importo,
+                                        importo_viaggio: importo,
+                                        importo_colli: 0,
+                                        count: 1,
+                                        quantita: 0,
+                                        peso: 0,
+                                        km: parseFloat(t.km_reali) || 0,
+                                        consegne: p.length,
+                                        tempo_min: parseInt(t.t_tot_min) || 0,
+                                        targa: targaStrVal,
+                                        nome: nomeStrVal,
+                                        patente: patenteVal,
+                                        isGC: true
+                                    };
+                                } else {
+                                    let obj = pivotData[rowKey][day];
+                                    obj.importo += importo;
+                                    obj.importo_viaggio += importo;
+                                    obj.count += 1;
+                                    obj.km += parseFloat(t.km_reali) || 0;
+                                    obj.consegne += p.length;
+                                    obj.tempo_min += parseInt(t.t_tot_min) || 0;
+                                    
+                                    if (targaStrVal && !obj.targa.includes(targaStrVal)) {
+                                        obj.targa += obj.targa ? `, ${targaStrVal}` : targaStrVal;
+                                    }
+                                    if (nomeStrVal && !obj.nome.includes(nomeStrVal)) {
+                                        obj.nome += obj.nome ? `, ${nomeStrVal}` : nomeStrVal;
+                                    }
+                                }
+                            } else {
+                                // Se ci sono più giri omonimi nello stesso giorno, sommiamo
+                                if (!pivotData[rowKey]) pivotData[rowKey] = {};
+                                if (!pivotData[rowKey][day]) pivotData[rowKey][day] = 0;
+                                pivotData[rowKey][day] += importo;
+                            }
+                        }
+                    }
+                }
+
+                // UI UPDATE: TUTTI vs SINGOLO
+                document.getElementById('summary-container').style.display = (clientSel === "TUTTI") ? 'block' : 'none';
+                document.getElementById('pivot-container').style.display = (clientSel !== "TUTTI") ? 'block' : 'none';
+                document.getElementById('export-actions').style.display = (clientSel !== "TUTTI") ? 'flex' : 'none';
+                updateExtraButtons();
+
+                if (clientSel === "TUTTI") {
+                    document.getElementById('gc-count').textContent = countGC;
+                    document.getElementById('gc-money').textContent = totGC.toFixed(2);
+                    document.getElementById('cat-count').textContent = countCat;
+                    document.getElementById('cat-money').textContent = totCat.toFixed(2);
+                    document.getElementById('bau-count').textContent = countBau;
+                    document.getElementById('bau-money').textContent = totBau.toFixed(2);
+                    document.getElementById('dnr-count').textContent = countDnr;
+                    document.getElementById('dnr-money').textContent = totDnr.toFixed(2);
+                    document.getElementById('total-money').textContent = (totGC + totCat + totBau + totDnr).toFixed(2);
+                } else {
+                    // Generazione Matrice
+                    document.getElementById('pivot-title').textContent = `Fatturazione ${clientSel} - ${currentMonthLabel}`;
+                    
+                    // Inizializza le chiavi delle navette dinamicamente per il cliente selezionato
+                    const navettePerPivot = clientNavetteMap[clientSel] || [];
+                    navettePerPivot.forEach(nav => {
+                        let nomeKey = nav.nome ? `NAVETTA ${nav.nome}` : "NAVETTA";
+                        nomeKey = nomeKey.toUpperCase();
+                        if (!pivotData[nomeKey]) pivotData[nomeKey] = {};
+                    });
+                    
+                    buildPivotTable(pivotData, parseInt(year), parseInt(month), configCattel);
+                    
+                    if (clientSel && clientSel !== "TUTTI") {
+                        document.getElementById('standard-summary-container').style.display = 'block';
+                        document.getElementById('btn-export-standard').style.display = 'inline-flex';
+                        document.getElementById('standard-summary-client-name').textContent = clientSel;
+                        document.getElementById('standard-summary-month').textContent = currentMonthLabel;
+                        
+                        // We will pass the specific configuration later, for now we will get the config of the selected client
+                        let configStandard = {};
+                        const p = (window.appData && window.appData.lista_progetti || []).find(x => (x.nome || '').toUpperCase() === clientSel);
+                        if (p) {
+                            configStandard = {
+                                TARIFFA_B: parseFloat(p.patente_b) || 0,
+                                TARIFFA_C: parseFloat(p.patente_c) || 0,
+                                TARIFFA_NAV1: parseFloat(p.navetta_sommacampagna) || 0,
+                                TARIFFA_NAV2: parseFloat(p.navetta_cerea) || 0,
+                                TARIFFA_COLLO: parseFloat(p.cattel_collo) || 0,
+                                TARIFFA_DDT: parseFloat(p.costo_ddt_base) || 0,
+                                TARIFFA_FORFAIT: parseFloat(p.viaggio_forfait) || 0,
+                                // Aggiungi eventuali altre variabili del progetto
+                            };
+                        } else if (clientSel === "CATTEL") {
+                            configStandard = configCattel; // Fallback per Cattel
+                        } else if (clientSel === "GRAN CHEF" || clientSel === "BAUER") {
+                            configStandard = {
+                                TARIFFA_B: TARIFFA_GC_B || 0,
+                                TARIFFA_C: TARIFFA_GC || 0,
+                                TARIFFA_NAV1: TARIFFA_GC || 0,
+                                TARIFFA_NAV2: 0,
+                                TARIFFA_COLLO: 0,
+                                TARIFFA_DDT: 0,
+                                TARIFFA_FORFAIT: 0
+                            };
+                        }
+                        
+                        // Passiamo clientNavetteMap per la risoluzione
+                        buildStandardSummaryTable(trips, parseInt(year), parseInt(month), mezziMap, configStandard, clientSel, clientNavetteMap);
+                    } else {
+                        document.getElementById('standard-summary-container').style.display = 'none';
+                        document.getElementById('btn-export-standard').style.display = 'none';
+                    }
+                }
+
+                Swal.close();
+
+            } catch (err) {
+                console.error("Errore lettura:", err);
+                Swal.fire('Errore', 'Impossibile leggere i dati: ' + err.message, 'error');
+            }
+        };
+
+        window.elaboraDatiDaPresenze = async function() {
+            const monthVal = document.getElementById('month-selector').value;
+            const clientSel = document.getElementById('client-selector').value;
+            
+            if (!monthVal) {
+                Swal.fire('Errore', 'Seleziona un mese', 'error');
+                return;
+            }
+
+            const [year, month] = monthVal.split('-');
+            const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+            window.currentMonthLabel = `${monthNames[parseInt(month)-1]} ${year}`;
+            window.currentClient = clientSel;
+
+            Swal.fire({
+                title: 'Lettura Presenze...',
+                text: 'Elaborazione dati in corso...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            try {
+                // Leggiamo i progetti (tariffe)
+                const { getDocs, collection, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const progSnap = await window.getDocsConFallback(collection(db, "progetti"));
+                
+                let configStandard = {
+                    TARIFFA_B: 0, TARIFFA_C: 0, TARIFFA_NAV1: 0, TARIFFA_NAV2: 0, TARIFFA_COLLO: 0, TARIFFA_DDT: 0, TARIFFA_FORFAIT: 0
+                };
+                
+                if (clientSel !== "TUTTI") {
+                    progSnap.forEach(docSnap => {
+                        const d = docSnap.data();
+                        if ((d.nome || "").toUpperCase() === clientSel.toUpperCase()) {
+                            configStandard = {
+                                TARIFFA_B: parseFloat(d.patente_b) || 0,
+                                TARIFFA_C: parseFloat(d.patente_c) || 0,
+                                TARIFFA_NAV1: parseFloat(d.navetta_sommacampagna) || 0,
+                                TARIFFA_NAV2: parseFloat(d.navetta_cerea) || 0,
+                                TARIFFA_COLLO: parseFloat(d.cattel_collo) || 0,
+                                TARIFFA_DDT: parseFloat(d.costo_ddt_base) || 0,
+                                TARIFFA_FORFAIT: parseFloat(d.viaggio_forfait) || 0,
+                            };
+                        }
+                    });
+                }
+
+                // Mappa mezzi
+                let mezziMap = {};
+                try {
+                    const mezziSnap = await window.getDocsConFallback(collection(db, "mezzi"));
+                    mezziSnap.forEach(d => {
+                        const m = d.data();
+                        if (m.targa) mezziMap[m.targa.toUpperCase()] = m.patente || 'B';
+                    });
+                } catch(e) {}
+
+                // Presenze
+                const presenzeRef = collection(db, "presenze");
+                const q = query(presenzeRef, where("mese", "==", monthVal));
+                const snap = await window.getDocsConFallback(q);
+
+                let pivotData = {};
+                let tripsMock = [];
+
+                snap.forEach(docSnap => {
+                    const d = docSnap.data();
+                    const clienteStr = (d.cliente || "").toUpperCase();
+                    
+                    if (clientSel !== "TUTTI" && clienteStr !== clientSel.toUpperCase()) return;
+                    
+                    let day = 1;
+                    if (d.data) {
+                        const parts = d.data.includes('-') ? d.data.split('-') : d.data.split('/');
+                        day = parseInt(parts.length > 2 ? parts[2] : parts[0]);
+                    }
+                    if (!day) return;
+
+                    let viaggioStr = (d.viaggio || "GENERICO").toUpperCase();
+                    let targaStr = (d.targa || "").toUpperCase();
+                    let autistaStr = (d.autistaNome || "").toUpperCase();
+                    let patenteVal = mezziMap[targaStr] || 'B';
+                    
+                    let importoBase = patenteVal === 'C' ? configStandard.TARIFFA_C : configStandard.TARIFFA_B;
+                    if (viaggioStr.includes("NAVETTA")) {
+                        importoBase = viaggioStr.includes("CEREA") ? configStandard.TARIFFA_NAV2 : configStandard.TARIFFA_NAV1;
+                        if (importoBase === 0) importoBase = patenteVal === 'C' ? configStandard.TARIFFA_C : configStandard.TARIFFA_B; // fallback se navetta non ha tariffa
+                    }
+                    
+                    tripsMock.push({
+                        id: docSnap.id,
+                        rawDate: d.data,
+                        nome_giro: viaggioStr,
+                        cliente: clienteStr,
+                        targa: targaStr,
+                        punti: []
+                    });
+
+                    let rowKey = viaggioStr;
+                    if (!pivotData[rowKey]) pivotData[rowKey] = {};
+                    
+                    if (clienteStr === "CATTEL") {
+                        let attempt = 1, currentKey = rowKey;
+                        while (pivotData[currentKey] && pivotData[currentKey][day] !== undefined) {
+                            attempt++; currentKey = `${rowKey} (${attempt})`;
+                        }
+                        if (!pivotData[currentKey]) pivotData[currentKey] = {};
+                        
+                        pivotData[currentKey][day] = {
+                            importo: importoBase, importo_viaggio: importoBase, importo_colli: 0,
+                            count: 1, quantita: 0, peso: 0, km: d.kmDelta || 0,
+                            targa: targaStr, nome: autistaStr, patente: patenteVal
+                        };
+                    } else if (clienteStr === "GRAN CHEF") {
+                        if (rowKey.includes("VIAGGIO B") || rowKey.includes("SOMMACAMPAGNA") || rowKey.includes("NAVETTA")) {
+                            rowKey = "NAVETTA SOMMACAMPAGNA";
+                        } else if (rowKey.includes("VIAGGIO A") || rowKey.includes("GRAN CHEF")) {
+                            rowKey = "VIAGGIO A";
+                        }
+                        if (!pivotData[rowKey]) pivotData[rowKey] = {};
+                        
+                        if (pivotData[rowKey][day] === undefined) {
+                            pivotData[rowKey][day] = {
+                                importo: importoBase, importo_viaggio: importoBase, importo_colli: 0,
+                                count: 1, quantita: 0, peso: 0, km: d.kmDelta || 0,
+                                consegne: 0, tempo_min: 0, targa: targaStr, nome: autistaStr, patente: patenteVal, isGC: true
+                            };
+                        } else {
+                            let obj = pivotData[rowKey][day];
+                            obj.importo += importoBase; obj.importo_viaggio += importoBase; obj.count += 1; obj.km += d.kmDelta || 0;
+                            if (targaStr && !obj.targa.includes(targaStr)) obj.targa += `, ${targaStr}`;
+                            if (autistaStr && !obj.nome.includes(autistaStr)) obj.nome += `, ${autistaStr}`;
+                        }
+                    } else {
+                        if (!pivotData[rowKey][day]) pivotData[rowKey][day] = 0;
+                        pivotData[rowKey][day] += importoBase;
+                    }
+                    
+                    // Gestione navette aggiuntive (array)
+                    if (d.attivitaAggiuntive && Array.isArray(d.attivitaAggiuntive)) {
+                        d.attivitaAggiuntive.forEach((nav, idx) => {
+                            let navettaStr = (nav.descrizione || "NAVETTA EXTRA").toUpperCase();
+                            let nImporto = navettaStr.includes("CEREA") ? configStandard.TARIFFA_NAV2 : (configStandard.TARIFFA_NAV1 || importoBase);
+                            if (nImporto === 0) nImporto = importoBase; // Fallback se non ci sono tariffe specifiche
+                            
+                            tripsMock.push({
+                                id: docSnap.id + "_nav_" + idx,
+                                rawDate: d.data,
+                                nome_giro: navettaStr,
+                                cliente: clienteStr,
+                                targa: targaStr,
+                                punti: []
+                            });
+
+                            if (clienteStr === "CATTEL") {
+                                let nAttempt = 1, nKey = navettaStr;
+                                while (pivotData[nKey] && pivotData[nKey][day] !== undefined) {
+                                    nAttempt++; nKey = `${navettaStr} (${nAttempt})`;
+                                }
+                                if (!pivotData[nKey]) pivotData[nKey] = {};
+                                pivotData[nKey][day] = {
+                                    importo: nImporto, importo_viaggio: nImporto, importo_colli: 0, count: 1,
+                                    quantita: 0, peso: 0, km: 0, targa: targaStr, nome: autistaStr, patente: patenteVal
+                                };
+                            } else if (clienteStr === "GRAN CHEF") {
+                                let nRowKey = "NAVETTA SOMMACAMPAGNA";
+                                if (!pivotData[nRowKey]) pivotData[nRowKey] = {};
+                                if (pivotData[nRowKey][day] === undefined) {
+                                    pivotData[nRowKey][day] = {
+                                        importo: nImporto, importo_viaggio: nImporto, importo_colli: 0, count: 1,
+                                        quantita: 0, peso: 0, km: 0, consegne: 0, tempo_min: 0,
+                                        targa: targaStr, nome: autistaStr, patente: patenteVal, isGC: true
+                                    };
+                                } else {
+                                    let obj = pivotData[nRowKey][day];
+                                    obj.importo += nImporto; obj.importo_viaggio += nImporto; obj.count += 1;
+                                    if (targaStr && !obj.targa.includes(targaStr)) obj.targa += `, ${targaStr}`;
+                                    if (autistaStr && !obj.nome.includes(autistaStr)) obj.nome += `, ${autistaStr}`;
+                                }
+                            } else {
+                                if (!pivotData[navettaStr]) pivotData[navettaStr] = {};
+                                if (!pivotData[navettaStr][day]) pivotData[navettaStr][day] = 0;
+                                pivotData[navettaStr][day] += nImporto;
+                            }
+                        });
+                    }
+                });
+
+                if (clientSel === "TUTTI") {
+                    document.getElementById('pivot-container').style.display = 'none';
+                    document.getElementById('export-actions').style.display = 'none';
+                    document.getElementById('standard-summary-container').style.display = 'none';
+                    document.getElementById('btn-export-standard').style.display = 'none';
+                } else {
+                    document.getElementById('pivot-container').style.display = 'block';
+                    document.getElementById('export-actions').style.display = 'flex';
+                    buildPivotTable(pivotData, parseInt(year), parseInt(month), configStandard);
+                    
+                    document.getElementById('standard-summary-container').style.display = 'block';
+                    document.getElementById('btn-export-standard').style.display = 'inline-flex';
+                    document.getElementById('standard-summary-client-name').textContent = clientSel;
+                    document.getElementById('standard-summary-month').textContent = window.currentMonthLabel;
+                    
+                    buildStandardSummaryTable(tripsMock, parseInt(year), parseInt(month), mezziMap, configStandard, clientSel);
+                }
+
+                Swal.close();
+
+            } catch(e) {
+                console.error("Errore elaborazione presenze:", e);
+                Swal.fire('Errore', 'Impossibile elaborare i dati presenze: ' + e.message, 'error');
+            }
+        };
+
+        function buildPivotTable(pivotData, year, month, configCattel = {}) {
+            const thead = document.getElementById('pivot-thead');
+            const tbody = document.getElementById('pivot-tbody');
+            const tfoot = document.getElementById('pivot-tfoot');
+            
+            thead.innerHTML = ''; tbody.innerHTML = ''; tfoot.innerHTML = '';
+
+            const daysInMonth = new Date(year, month, 0).getDate();
+            
+            // Header
+            const weekdays = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+            let trHead = '<tr><th>ZONA / GIRO</th>';
+            for(let d=1; d<=daysInMonth; d++) {
+                const date = new Date(year, month - 1, d);
+                const dayName = weekdays[date.getDay()];
+                trHead += `<th>${dayName} ${d}</th>`;
+            }
+            trHead += '<th>TOTALE</th></tr>';
+            thead.innerHTML = trHead;
+
+            // Ordinamento: prima le zone/viaggi ordinari, poi le navette in fondo
+            const zoneNames = Object.keys(pivotData).sort((a, b) => {
+                const aIsNav = a.toUpperCase().includes("NAVETTA");
+                const bIsNav = b.toUpperCase().includes("NAVETTA");
+                if (aIsNav && !bIsNav) return 1;
+                if (!aIsNav && bIsNav) return -1;
+                return a.localeCompare(b);
+            });
+            
+            let columnTotals = Array(daysInMonth + 1).fill(0); // 1-indexed
+            let columnViaggioTotals = Array(daysInMonth + 1).fill(0);
+            let columnColliTotals = Array(daysInMonth + 1).fill(0);
+            let columnQuantitaTotals = Array(daysInMonth + 1).fill(0); // 1-indexed
+            let isCattelMode = false;
+
+            if (zoneNames.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${daysInMonth+2}" style="text-align:center">Nessun viaggio fatturabile trovato.</td></tr>`;
+                return;
+            }
+
+            zoneNames.forEach(zona => {
+                let rowHtml = `<tr><td>${zona}</td>`;
+                let rowTotal = 0;
+                
+                for(let d=1; d<=daysInMonth; d++) {
+                    const val = pivotData[zona][d];
+                    if (val) {
+                        let isObj = (typeof val === 'object');
+                        if (isObj && !val.isGC) isCattelMode = true;
+                        
+                        // Per il singolo giro Cattel, visualizziamo solo la tariffa fissa del viaggio (es. 340€ o 380€)
+                        // come da aspettative dell'utente (costo fisso).
+                        let importoRiga = isObj ? val.importo_viaggio : val; 
+                        let importoColonna = isObj ? val.importo : val; // Il lordo comprensivo di colli va nei totali di fine colonna
+                        
+                        let text = isObj && val.count > 1 ? `(${val.count}v) € ${importoRiga.toFixed(2)}` : `€ ${importoRiga.toFixed(2)}`;
+                        
+                        let cellStyle = "vertical-align: top;";
+                        let titleText = "";
+                        
+                        if (isObj) {
+                            let hasPesoAnomaly = false;
+                            let hasKmAnomaly = false;
+                            
+                            if (val.isGC) {
+                                titleText = `Viaggi: ${val.count} | Consegne: ${val.consegne}\n` +
+                                            `Km: ${val.km.toFixed(1)} | Tempo: ${val.tempo_min} min\n` +
+                                            `Targa: ${val.targa || 'N/D'}\n` +
+                                            `Autista: ${val.nome || 'N/D'}`;
+                            } else {
+                                titleText = `Viaggi: ${val.count} | Colli: ${val.quantita} | Peso: ${val.peso}kg | Km: ${val.km}\n` +
+                                            `Targa: ${val.targa || 'N/D'} (Pat. ${val.patente})\n` +
+                                            `Autista: ${val.nome || 'N/D'}`;
+                                            
+                                let limP = val.patente === 'C' ? configCattel.limPesoC : configCattel.limPesoB;
+                                let limK = val.patente === 'C' ? configCattel.limKmC : configCattel.limKmB;
+                                
+                                hasPesoAnomaly = limP > 0 && val.peso > limP;
+                                hasKmAnomaly = limK > 0 && val.km > limK;
+
+                                if (hasPesoAnomaly || hasKmAnomaly) {
+                                    cellStyle += " background-color: #fef08a; color: #854d0e; font-weight: bold;";
+                                }
+                            }
+                            
+                            columnQuantitaTotals[d] += val.quantita;
+
+                            // Usiamo data-attributes per Excel e inseriamo il custom-tooltip con classe extra-info-cell (così SheetJS/PDF lo ignorano)
+                            // Aggiungiamo un div con position: relative interno al td in modo che il tooltip absolute si posizioni correttamente
+                            rowHtml += `<td class="excel-note" 
+                                style="${cellStyle}" 
+                                data-anomaly="${hasPesoAnomaly || hasKmAnomaly ? '1' : '0'}"
+                                data-note="${titleText.replace(/"/g, '&quot;').replace(/\n/g, ' | ')}"
+                                data-targa="${val.targa || ''}"
+                                data-autista="${(val.nome || '').replace(/"/g, '&quot;')}"
+                                data-colli="${val.quantita}"
+                                data-peso="${val.peso}"
+                                data-km="${val.km}"
+                                data-importo-viaggio="${val.importo_viaggio.toFixed(2)}"
+                                data-importo-colli="${val.importo_colli.toFixed(2)}"
+                            ><div style="position: relative; width: 100%; height: 100%; display: block;">${text}<div class="extra-info-cell custom-tooltip">${titleText.replace(/"/g, '&quot;')}</div></div></td>`;
+                        } else {
+                            // Non Cattel (GC, Bauer, DNR)
+                            rowHtml += `<td style="${cellStyle}" title="${titleText}">${text}</td>`;
+                        }
+                        rowTotal += importoRiga;
+                        columnTotals[d] += importoColonna;
+                        if (isObj) {
+                            columnViaggioTotals[d] += val.importo_viaggio;
+                            columnColliTotals[d] += val.importo_colli;
+                        }
+                    } else {
+                        rowHtml += `<td></td>`;
+                    }
+                }
+                
+                rowHtml += `<td>€ ${rowTotal.toFixed(2)}</td></tr>`;
+                tbody.insertAdjacentHTML('beforeend', rowHtml);
+            });
+
+            // Footer (Parziali)
+            let trFoot = '';
+            
+            if (isCattelMode) {
+                let trViaggio = '<tr><td style="font-weight:600; color:#475569;">TOTALE GIORNALIERO VIAGGI</td>';
+                let grandViaggio = 0;
+                let trColliEuro = '<tr><td style="font-weight:600; color:#475569;">TOTALE COSTO COLLI</td>';
+                let grandColliEuro = 0;
+                let trLordo = '<tr><td style="font-weight:bold; background:#e5e7eb;">TOTALE LORDO GIORNALIERO</td>';
+                let grandLordo = 0;
+                let trColliCount = '<tr><td style="font-weight:bold; background:#e0e7ff;">SOMMA COLLI GIORNALIERA</td>';
+                let totalColliMese = 0;
+                
+                for(let d=1; d<=daysInMonth; d++) {
+                    trViaggio += `<td style="color:#475569;">€ ${columnViaggioTotals[d].toFixed(2)}</td>`;
+                    grandViaggio += columnViaggioTotals[d];
+                    
+                    trColliCount += `<td style="font-weight:bold; background:#e0e7ff;">${columnQuantitaTotals[d] > 0 ? columnQuantitaTotals[d] : ''}</td>`;
+                    totalColliMese += columnQuantitaTotals[d];
+
+                    trColliEuro += `<td style="color:#475569;">€ ${columnColliTotals[d].toFixed(2)}</td>`;
+                    grandColliEuro += columnColliTotals[d];
+                    
+                    if (columnTotals[d] > 0) {
+                        trLordo += `<td style="font-weight:bold; background:#e5e7eb;">€ ${columnTotals[d].toFixed(2)}</td>`;
+                        grandLordo += columnTotals[d];
+                    } else {
+                        trLordo += `<td style="font-weight:bold; background:#e5e7eb;">€ 0.00</td>`;
+                    }
+                }
+                trViaggio += `<td style="font-weight:bold; color:#475569;">€ ${grandViaggio.toFixed(2)}</td></tr>`;
+                trColliCount += `<td style="font-weight:bold; background:#e0e7ff;">${totalColliMese}</td></tr>`;
+                trColliEuro += `<td style="font-weight:bold; color:#475569;">€ ${grandColliEuro.toFixed(2)}</td></tr>`;
+                trLordo += `<td style="font-weight:bold; background:#e5e7eb;">€ ${grandLordo.toFixed(2)}</td></tr>`;
+                
+                trFoot += trViaggio + trColliCount + trColliEuro + trLordo;
+            } else {
+                trFoot = '<tr><td>PARZIALE</td>';
+                let grandTotal = 0;
+                for(let d=1; d<=daysInMonth; d++) {
+                    if (columnTotals[d] > 0) {
+                        trFoot += `<td>€ ${columnTotals[d].toFixed(2)}</td>`;
+                        grandTotal += columnTotals[d];
+                    } else {
+                        trFoot += `<td>€ 0.00</td>`;
+                    }
+                }
+                trFoot += `<td>€ ${grandTotal.toFixed(2)}</td></tr>`;
+            }
+
+            tfoot.innerHTML = trFoot;
+        }
+
+        // ESPORTAZIONE
+        window.esportaExcel = function() {
+            const table = document.getElementById('pivot-table');
+            if (!table) return;
+
+            // --- 1. Raccolgo meta-dati dalle celle PRIMA di convertire la tabella ---
+            // Mappo posizione [row][col] -> {note, anomaly}
+            const cellMeta = {};
+            const allRows = table.querySelectorAll('tr');
+            allRows.forEach((tr, rIdx) => {
+                tr.querySelectorAll('td, th').forEach((td, cIdx) => {
+                    const note = td.getAttribute('data-note');
+                    const anomaly = td.getAttribute('data-anomaly');
+                    if (note || anomaly === '1') {
+                        if (!cellMeta[rIdx]) cellMeta[rIdx] = {};
+                        cellMeta[rIdx][cIdx] = {
+                            note: note ? note.replace(/&quot;/g, '"') : '',
+                            anomaly: anomaly === '1'
+                        };
+                    }
+                });
+            });
+
+            // --- 2. Converto la tabella ---
+            const wb = XLSX.utils.table_to_book(table, {sheet: "Fatturazione"});
+            const ws = wb.Sheets["Fatturazione"];
+            const range = XLSX.utils.decode_range(ws['!ref']);
+
+            // --- 3. Larghezze colonne ---
+            ws['!cols'] = [{ wch: 28 }];
+            for (let c = 1; c <= range.e.c - 1; c++) ws['!cols'].push({ wch: 9 });
+            ws['!cols'].push({ wch: 14 });
+
+            // --- 4. Conto le righe footer (ultima riga e le righe sopra con totali) ---
+            const totalRows = range.e.r + 1;
+            // Le ultime 4 righe sono: TOTALE GIORNALIERO VIAGGI, SOMMA COLLI, TOTALE COSTO COLLI, TOTALE LORDO
+            // (solo in modalità Cattel). Le identifichiamo leggendo il testo della prima cella.
+            const footerStartKeywords = ['TOTALE GIORNALIERO', 'SOMMA COLLI', 'TOTALE COSTO', 'TOTALE LORDO', 'PARZIALE'];
+
+            // --- 5. Stilo tutte le celle ---
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                const firstCellAddr = XLSX.utils.encode_cell({r: R, c: 0});
+                const firstCellVal = (ws[firstCellAddr] && ws[firstCellAddr].v) ? String(ws[firstCellAddr].v).toUpperCase() : '';
+                const isFooter = footerStartKeywords.some(k => firstCellVal.includes(k));
+                const isLordo = firstCellVal.includes('TOTALE LORDO');
+
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    if (!ws[cellAddress]) ws[cellAddress] = { v: '', t: 's' };
+                    const cell = ws[cellAddress];
+                    if (!cell.s) cell.s = {};
+
+                    // Bordi base
+                    cell.s.border = {
+                        top:    { style: 'thin', color: { rgb: 'FFD1D5DB' } },
+                        bottom: { style: 'thin', color: { rgb: 'FFD1D5DB' } },
+                        left:   { style: 'thin', color: { rgb: 'FFD1D5DB' } },
+                        right:  { style: 'thin', color: { rgb: 'FFD1D5DB' } }
+                    };
+                    cell.s.alignment = { vertical: 'center', wrapText: false };
+
+                    if (R === 0) {
+                        // Header
+                        cell.s.fill = { fgColor: { rgb: 'FF4F46E5' } };
+                        cell.s.font = { color: { rgb: 'FFFFFFFF' }, bold: true };
+                        cell.s.alignment.horizontal = 'center';
+                    } else if (isLordo) {
+                        // Riga totale lordo: grigio scuro bold
+                        cell.s.fill = { fgColor: { rgb: 'FFE5E7EB' } };
+                        cell.s.font = { bold: true };
+                        cell.s.alignment.horizontal = C === 0 ? 'left' : 'right';
+                    } else if (isFooter && firstCellVal.includes('SOMMA COLLI')) {
+                        // Riga somma colli: indigo chiaro bold
+                        cell.s.fill = { fgColor: { rgb: 'FFE0E7FF' } };
+                        cell.s.font = { bold: true };
+                        cell.s.alignment.horizontal = C === 0 ? 'left' : 'right';
+                    } else if (isFooter) {
+                        // Altre righe footer
+                        cell.s.fill = { fgColor: { rgb: 'FFF8FAFC' } };
+                        cell.s.font = { bold: false, color: { rgb: 'FF475569' } };
+                        cell.s.alignment.horizontal = C === 0 ? 'left' : 'right';
+                    } else {
+                        // Righe dati
+                        if (C === 0) {
+                            cell.s.font = { bold: true };
+                            cell.s.alignment.horizontal = 'left';
+                        } else {
+                            cell.s.alignment.horizontal = 'right';
+                        }
+
+                        // Colore giallo anomalia (leggo dal meta)
+                        if (cellMeta[R] && cellMeta[R][C] && cellMeta[R][C].anomaly) {
+                            cell.s.fill = { fgColor: { rgb: 'FFFEF08A' } };
+                            cell.s.font = { bold: true, color: { rgb: 'FF854D0E' } };
+                        }
+                    }
+
+                    // Conversione valori € -> numero
+                    if (C > 0 && cell.v && typeof cell.v === 'string') {
+                        let numStr = cell.v.replace('€', '').trim();
+                        if (!isNaN(parseFloat(numStr)) && numStr !== '') {
+                            cell.v = parseFloat(numStr);
+                            cell.t = 'n';
+                            cell.z = '"€"\\ #,##0.00';
+                        }
+                    }
+                }
+            }
+
+            // --- 6. Aggiungo commenti Excel nativi alle celle Cattel ---
+            if (!ws['!comments']) ws['!comments'] = [];
+            Object.keys(cellMeta).forEach(rStr => {
+                const R = parseInt(rStr);
+                Object.keys(cellMeta[R]).forEach(cStr => {
+                    const C = parseInt(cStr);
+                    const meta = cellMeta[R][C];
+                    if (!meta.note) return;
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    // Formato commento xlsx-js-style
+                    ws[cellAddress].c = [{
+                        a: 'LogSolution',
+                        t: meta.note
+                    }];
+                    ws[cellAddress].c.hidden = true;
+                });
+            });
+
+            XLSX.writeFile(wb, `Fatturazione_${currentClient.replace(/ /g,'_')}_${currentMonthLabel.replace(/ /g,'_')}.xlsx`);
+        };
+
+
+        window.esportaPDF = function() {
+            const { jsPDF } = window.jspdf;
+            // Usiamo formato orizzontale 'l' (landscape) perchè ci sono 31 colonne
+            const doc = new jsPDF('l', 'pt', 'a4');
+            
+            doc.setFontSize(16);
+            doc.text(`Fatturazione ${currentClient} - ${currentMonthLabel}`, 40, 40);
+
+            // Nascondiamo le note extra per l'export
+            document.querySelectorAll('.extra-info-cell').forEach(el => el.style.display = 'none');
+
+            doc.autoTable({
+                html: '#pivot-table',
+                startY: 60,
+                styles: { 
+                    fontSize: 7, 
+                    cellPadding: 2, 
+                    lineWidth: 0.5, 
+                    lineColor: [209, 213, 219] 
+                },
+                headStyles: { 
+                    fillColor: [79, 70, 229],
+                    textColor: [255, 255, 255],
+                    halign: 'center'
+                },
+                footStyles: {
+                    fillColor: [209, 213, 219],
+                    textColor: 20
+                },
+                theme: 'grid'
+            });
+
+            // Ripristiniamo le note
+            document.querySelectorAll('.extra-info-cell').forEach(el => el.style.display = '');
+
+            doc.save(`Fatturazione_${currentClient.replace(/ /g, '_')}_${currentMonthLabel.replace(/ /g, '_')}.pdf`);
+        };
+    </script>
+
+    <script type="module">
+        import { db, app } from "./core/firebase-init.js";
+        import { getFirestore, collection, doc, query, where, getDocs }
+            from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
+        import { getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+        const storage = getStorage(app);
+
+        const functions = getFunctions(app, "europe-west1");
+
+        // Espone le funzioni globalmente per l'HTML
+        window.openEmailPopup = async function() {
+            const client = window.currentClient;
+            const period = window.currentMonthLabel;
+            if (!client || client === "TUTTI") {
+                Swal.fire({ title: 'Attenzione', text: 'Seleziona un cliente specifico prima di procedere all\'invio.', icon: 'warning', confirmButtonColor: '#4f46e5' });
+                return;
+            }
+
+            Swal.fire({
+                title: 'Recupero contatti...',
+                text: 'Caricamento impostazioni email del cliente in corso.',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            let destEmail = '';
+            try {
+                const q = query(collection(db, "progetti"), where("nome", "==", client));
+                const querySnapshot = await window.getDocsConFallback(q);
+                if (!querySnapshot.empty) {
+                    const data = querySnapshot.docs[0].data();
+                    const contatti = data.contatti || [];
+                    const dest = contatti.find(c => c.isReport === true);
+                    if (dest && dest.email) {
+                        destEmail = dest.email;
+                    } else if (data.email) {
+                        destEmail = data.email; // fallback se non c'è flag
+                    }
+                }
+            } catch (err) {
+                console.error("Errore recupero email cliente:", err);
+            }
+
+            Swal.close();
+
+            document.getElementById('emailDestinatario').value = destEmail;
+            document.getElementById('emailOggetto').value = `Fatturazione ${client} - ${period}`;
+            document.getElementById('emailCorpo').value = `Gentile cliente,\n\nin allegato Le trasmettiamo il riepilogo delle consegne di ${client} relative al periodo di ${period}.\n\nRestiamo a disposizione per qualsiasi chiarimento.\n\nCordiali saluti,\nAmministrazione Log Solution`;
+            
+            document.getElementById('attachPdf').checked = true;
+            document.getElementById('attachExcel').checked = false;
+            
+            document.getElementById('emailModal').classList.add('active');
+        }
+
+        window.closeEmailModal = function() {
+            document.getElementById('emailModal').classList.remove('active');
+        }
+
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const dest = document.getElementById('emailDestinatario').value.trim();
+            const ogger = document.getElementById('emailOggetto').value.trim();
+            const corpo = document.getElementById('emailCorpo').value.trim();
+            const attPdf = document.getElementById('attachPdf').checked;
+            const attExcel = document.getElementById('attachExcel').checked;
+
+            if (!dest) {
+                Swal.fire({ title: 'Errore', text: 'Inserisci un indirizzo e-mail destinatario valido.', icon: 'error', confirmButtonColor: '#4f46e5' });
+                return;
+            }
+            if (!attPdf && !attExcel) {
+                Swal.fire({ title: 'Errore', text: 'Seleziona almeno un formato di allegato (PDF o Excel).', icon: 'error', confirmButtonColor: '#4f46e5' });
+                return;
+            }
+
+            Swal.fire({
+                title: 'Generazione dati in corso...',
+                text: 'Apertura client di posta e download allegati...',
+                timer: 2000,
+                showConfirmButton: false
+            });
+
+            try {
+                const safeClientName = (window.currentClient || "Cliente").replace(/[^a-zA-Z0-9_-]/g, "_");
+                const safeMonthLabel = (window.currentMonthLabel || "Mese").replace(/[^a-zA-Z0-9_-]/g, "_");
+
+                // 1. Download PDF locale
+                if (attPdf) {
+                    const { jsPDF } = window.jspdf;
+                    const docPdf = new jsPDF('l', 'pt', 'a4');
+                    docPdf.setFontSize(16);
+                    docPdf.text(`Fatturazione ${window.currentClient} - ${window.currentMonthLabel}`, 40, 40);
+
+                    document.querySelectorAll('.extra-info-cell').forEach(el => el.style.display = 'none');
+                    docPdf.autoTable({
+                        html: '#pivot-table',
+                        startY: 60,
+                        styles: { fontSize: 7, cellPadding: 2, lineWidth: 0.5, lineColor: [209, 213, 219] },
+                        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], halign: 'center' },
+                        footStyles: { fillColor: [209, 213, 219], textColor: 20 },
+                        theme: 'grid'
+                    });
+                    document.querySelectorAll('.extra-info-cell').forEach(el => el.style.display = '');
+                    
+                    docPdf.save(`Riepilogo_${safeClientName}_${safeMonthLabel}.pdf`);
+                }
+
+                // 2. Download Excel locale
+                if (attExcel) {
+                    const table = document.getElementById('pivot-table');
+                    const cellMeta = {};
+                    const allRows = table.querySelectorAll('tbody tr, tfoot tr');
+                    allRows.forEach((tr, rIdx) => {
+                        tr.querySelectorAll('td, th').forEach((td, cIdx) => {
+                            const note = td.getAttribute('data-note');
+                            const anomaly = td.getAttribute('data-anomaly');
+                            if (note || anomaly === '1') {
+                                if (!cellMeta[rIdx]) cellMeta[rIdx] = {};
+                                cellMeta[rIdx][cIdx] = {
+                                    note: note ? note.replace(/&quot;/g, '"') : '',
+                                    anomaly: anomaly === '1'
+                                };
+                            }
+                        });
+                    });
+
+                    const wb = XLSX.utils.table_to_book(table, {sheet: "Fatturazione"});
+                    const ws = wb.Sheets["Fatturazione"];
+                    const range = XLSX.utils.decode_range(ws['!ref']);
+
+                    ws['!cols'] = [{ wch: 28 }];
+                    for (let c = 1; c <= range.e.c - 1; c++) ws['!cols'].push({ wch: 9 });
+                    ws['!cols'].push({ wch: 14 });
+
+                    const footerStartKeywords = ['TOTALE GIORNALIERO', 'SOMMA COLLI', 'TOTALE COSTO', 'TOTALE LORDO', 'PARZIALE'];
+
+                    for (let R = range.s.r; R <= range.e.r; ++R) {
+                        const firstCellAddr = XLSX.utils.encode_cell({r: R, c: 0});
+                        const firstCellVal = (ws[firstCellAddr] && ws[firstCellAddr].v) ? String(ws[firstCellAddr].v).toUpperCase() : '';
+                        const isFooter = footerStartKeywords.some(k => firstCellVal.includes(k));
+                        const isLordo = firstCellVal.includes('TOTALE LORDO');
+
+                        for (let C = range.s.c; C <= range.e.c; ++C) {
+                            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                            if (!ws[cellAddress]) ws[cellAddress] = { v: '', t: 's' };
+                            const cell = ws[cellAddress];
+                            if (!cell.s) cell.s = {};
+
+                            cell.s.border = {
+                                top:    { style: 'thin', color: { rgb: 'FFD1D5DB' } },
+                                bottom: { style: 'thin', color: { rgb: 'FFD1D5DB' } },
+                                left:   { style: 'thin', color: { rgb: 'FFD1D5DB' } },
+                                right:  { style: 'thin', color: { rgb: 'FFD1D5DB' } }
+                            };
+                            cell.s.alignment = { vertical: 'center', wrapText: false };
+
+                            if (R === 0) {
+                                cell.s.fill = { fgColor: { rgb: 'FF4F46E5' } };
+                                cell.s.font = { color: { rgb: 'FFFFFFFF' }, bold: true };
+                                cell.s.alignment.horizontal = 'center';
+                            } else if (isLordo) {
+                                cell.s.fill = { fgColor: { rgb: 'FFE5E7EB' } };
+                                cell.s.font = { bold: true };
+                                cell.s.alignment.horizontal = C === 0 ? 'left' : 'right';
+                            } else if (isFooter && firstCellVal.includes('SOMMA COLLI')) {
+                                cell.s.fill = { fgColor: { rgb: 'FFE0E7FF' } };
+                                cell.s.font = { bold: true };
+                                cell.s.alignment.horizontal = C === 0 ? 'left' : 'right';
+                            } else if (isFooter) {
+                                cell.s.fill = { fgColor: { rgb: 'FFF8FAFC' } };
+                                cell.s.font = { bold: false, color: { rgb: 'FF475569' } };
+                                cell.s.alignment.horizontal = C === 0 ? 'left' : 'right';
+                            } else {
+                                if (C === 0) {
+                                    cell.s.font = { bold: true };
+                                    cell.s.alignment.horizontal = 'left';
+                                } else {
+                                    cell.s.alignment.horizontal = 'right';
+                                }
+
+                                if (cellMeta[R] && cellMeta[R][C] && cellMeta[R][C].anomaly) {
+                                    cell.s.fill = { fgColor: { rgb: 'FFFEF08A' } };
+                                    cell.s.font = { bold: true, color: { rgb: 'FF854D0E' } };
+                                }
+                            }
+
+                            if (C > 0 && cell.v && typeof cell.v === 'string') {
+                                let numStr = cell.v.replace('€', '').trim();
+                                if (!isNaN(parseFloat(numStr)) && numStr !== '') {
+                                    cell.v = parseFloat(numStr);
+                                    cell.t = 'n';
+                                    cell.z = '"€"\\ #,##0.00';
+                                }
+                            }
+                        }
+                    }
+
+                    if (!ws['!comments']) ws['!comments'] = [];
+                    Object.keys(cellMeta).forEach(rStr => {
+                        const R = parseInt(rStr);
+                        Object.keys(cellMeta[R]).forEach(cStr => {
+                            const C = parseInt(cStr);
+                            const meta = cellMeta[R][C];
+                            if (!meta.note) return;
+                            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                            ws[cellAddress].c = [{ a: 'LogSolution', t: meta.note }];
+                            ws[cellAddress].c.hidden = true;
+                        });
+                    });
+
+                    XLSX.writeFile(wb, `Riepilogo_${safeClientName}_${safeMonthLabel}.xlsx`);
+                }
+
+                // 3. Apertura client Mail (es. Outlook)
+                const mailtoLink = `mailto:${dest}?subject=${encodeURIComponent(ogger)}&body=${encodeURIComponent(corpo)}`;
+                window.location.href = mailtoLink;
+                
+                closeEmailModal();
+
+            } catch (err) {
+                console.error("Errore generazione fattura locale:", err);
+                Swal.fire({ title: 'Errore', text: 'Si è verificato un errore durante la generazione: ' + err.message, icon: 'error', confirmButtonColor: '#4f46e5' });
+            }
+        });
+
+        window.buildGranChefSummaryTable = function(trips, year, month, mezziMap, TARIFFA_GC, TARIFFA_GC_B) {
+            const daysInMonth = new Date(year, month, 0).getDate();
+            let gcData = {};
+            for (let d = 1; d <= daysInMonth; d++) {
+                gcData[d] = {
+                    viaggioA: 0,
+                    navSomma: 0,
+                    totale: 0
+                };
+            }
+            
+            for (const t of trips) {
+                const nomeStr = (t.nome_giro || t.id_zona || 'GENERICO').toUpperCase();
+                
+                const dbClient = (t.cliente || '').toUpperCase();
+                let isGC = dbClient === "GRAN CHEF" || dbClient === "GRANCHEF" || t.is_grand_chef === true || t.is_gc === true;
+                if (!isGC) {
+                    const p = t.punti || t.punti_ottimizzati || [];
+                    isGC = p.some(pt => {
+                        const tg = (pt.tipologia_grado || pt.tipo || '').toUpperCase();
+                        const zn = (pt.zona || '').toUpperCase();
+                        return tg.includes("GRAND") || tg.includes("CHEF") || zn.includes("CHEF") || zn.includes("GRANCHEF");
+                    });
+                    if (!isGC && (nomeStr.includes("CHEF") || nomeStr.includes("GRAN"))) isGC = true;
+                }
+                
+                if (!isGC) continue; 
+                
+                let day = window.getDayFromDateString ? window.getDayFromDateString(t.rawDate) : null;
+                if (!day) continue;
+                
+                if (nomeStr.includes("VIAGGIO B") || nomeStr.includes("SOMMACAMPAGNA") || nomeStr.includes("NAVETTA")) {
+                    gcData[day].navSomma++;
+                } else {
+                    gcData[day].viaggioA++;
+                }
+            }
+            
+            // Render Table Body
+            const tbody = document.getElementById('granchef-summary-tbody');
+            tbody.innerHTML = '';
+            
+            let sumA = 0;
+            let sumS = 0;
+            let sumTot = 0;
+            
+            const weekdays = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+            
+            for (let d = 1; d <= daysInMonth; d++) {
+                const date = new Date(year, month - 1, d);
+                const dayName = weekdays[date.getDay()];
+                
+                let dayTotal = (gcData[d].viaggioA * TARIFFA_GC) + (gcData[d].navSomma * TARIFFA_GC_B);
+                gcData[d].totale = dayTotal;
+                
+                sumA += gcData[d].viaggioA;
+                sumS += gcData[d].navSomma;
+                sumTot += dayTotal;
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${dayName} ${d}</td>
+                        <td style="text-align: right;">${gcData[d].viaggioA || ''}</td>
+                        <td style="text-align: right;">${gcData[d].navSomma || ''}</td>
+                        <td style="text-align: right; font-weight: 500;">${dayTotal > 0 ? '€ ' + dayTotal.toFixed(2) : ''}</td>
+                    </tr>
+                `;
+            }
+            
+            // Render Table Footer
+            const tfoot = document.getElementById('granchef-summary-tfoot');
+            tfoot.innerHTML = `
+                <tr style="font-weight: bold; background: #f1f5f9;">
+                    <td>TOTALE</td>
+                    <td style="text-align: right;">${sumA}</td>
+                    <td style="text-align: right;">${sumS}</td>
+                    <td style="text-align: right;">€ ${sumTot.toFixed(2)}</td>
+                </tr>
+            `;
+            
+            // Render Recap Table
+            const recapTbody = document.getElementById('granchef-recap-tbody');
+            recapTbody.innerHTML = `
+                <tr>
+                    <td>VIAGGIO A</td>
+                    <td style="text-align: right;">€ ${TARIFFA_GC.toFixed(2)}</td>
+                    <td style="text-align: right;">${sumA}</td>
+                    <td style="text-align: right;">€ ${(TARIFFA_GC * sumA).toFixed(2)}</td>
+                </tr>
+                <tr>
+                    <td>NAVETTA SOMMACAMPAGNA</td>
+                    <td style="text-align: right;">€ ${TARIFFA_GC_B.toFixed(2)}</td>
+                    <td style="text-align: right;">${sumS}</td>
+                    <td style="text-align: right;">€ ${(TARIFFA_GC_B * sumS).toFixed(2)}</td>
+                </tr>
+                <tr style="font-weight: bold; background: #e2e8f0;">
+                    <td>TOTALE FATTURATO</td>
+                    <td colspan="2"></td>
+                    <td style="text-align: right;">€ ${sumTot.toFixed(2)}</td>
+                </tr>
+            `;
+            
+            window.currentGCConfig = {
+                TARIFFA_GC: TARIFFA_GC,
+                TARIFFA_GC_B: TARIFFA_GC_B
+            };
+            window.currentGCDays = daysInMonth;
+            window.currentGCMonthLabel = window.currentMonthLabel;
+        }
+
+        
+        window.toggleStandardColumns = function() {
+            const showColli = document.getElementById('toggle-colli').checked;
+            const showTotale = document.getElementById('toggle-totale-gg').checked;
+            
+            // Toggle headers
+            document.querySelectorAll('.col-colli').forEach(el => el.style.display = showColli ? '' : 'none');
+            document.querySelectorAll('.col-totale').forEach(el => el.style.display = showTotale ? '' : 'none');
+            
+            // Toggle row in recap
+            const recapRowHandling = document.getElementById('recap-row-handling');
+            if(recapRowHandling) recapRowHandling.style.display = showColli ? '' : 'none';
+            
+            const recapRowTotale = document.getElementById('recap-row-totale');
+            if(recapRowTotale) recapRowTotale.style.display = showTotale ? '' : 'none';
+        }
+
+        window.buildStandardSummaryTable = function(trips, year, month, mezziMap, config, clientName, clientNavetteMap) {
+            const daysInMonth = new Date(year, month, 0).getDate();
+            
+            const navetteConfigurate = (clientNavetteMap && clientNavetteMap[clientName]) || [];
+            if (navetteConfigurate.length === 0) {
+                // Fallback nel caso non ci siano navette
+                navetteConfigurate.push({nome: "SOMMACAMPAGNA", tariffa: config.TARIFFA_NAV1 || 0});
+                navetteConfigurate.push({nome: "BENCARNI", tariffa: config.TARIFFA_NAV2 || 0});
+            }
+            
+            let tableData = {};
+            for (let d = 1; d <= daysInMonth; d++) {
+                let initialData = {
+                    giriB: 0,
+                    giriC: 0,
+                    colli: 0,
+                    totale: 0,
+                    navetteCounts: {}
+                };
+                navetteConfigurate.forEach(nav => {
+                    initialData.navetteCounts[nav.nome || "NAVETTA"] = 0;
+                });
+                tableData[d] = initialData;
+            }
+            
+            const TARIFFA_B = config.TARIFFA_B || 0;
+            const TARIFFA_C = config.TARIFFA_C || 0;
+            const TARIFFA_COLLO = config.TARIFFA_COLLO || 0;
+            const TARIFFA_DDT = config.TARIFFA_DDT || 0;
+            const TARIFFA_FORFAIT = config.TARIFFA_FORFAIT || 0;
+            
+            for (const t of trips) {
+                const p = t.punti || t.punti_ottimizzati || [];
+                const nomeStr = (t.nome_giro || t.id_zona || 'GENERICO').toUpperCase();
+                
+                const dbClient = (t.cliente || '').toUpperCase();
+                let isClientMatch = dbClient === clientName.toUpperCase();
+                
+                if (!isClientMatch) {
+                    isClientMatch = p.some(pt => (pt.zona || '').toUpperCase().includes(clientName.toUpperCase()) || (pt.codice_frutta || '').toUpperCase().includes(clientName.toUpperCase()));
+                    if (!isClientMatch && nomeStr.includes(clientName.toUpperCase())) isClientMatch = true;
+                }
+                
+                if (!isClientMatch) continue; 
+                
+                let day = window.getDayFromDateString ? window.getDayFromDateString(t.rawDate) : null;
+                if (!day) continue;
+                
+                let q = 0;
+                p.forEach(pt => {
+                    q += parseFloat(pt.quantita) || 0;
+                });
+                
+                if (nomeStr.includes("NAVETTA")) {
+                    let matchedNav = null;
+                    for (let nav of navetteConfigurate) {
+                        if (nav.nome && nomeStr.includes(nav.nome.toUpperCase())) {
+                            matchedNav = nav; break;
+                        }
+                    }
+                    if (!matchedNav && navetteConfigurate.length > 0) matchedNav = navetteConfigurate[0];
+                    let navNome = matchedNav ? (matchedNav.nome || "NAVETTA") : null;
+                    if (navNome && tableData[day].navetteCounts[navNome] !== undefined) {
+                        tableData[day].navetteCounts[navNome]++;
+                    }
+                } else {
+                    const targaStr = (t.targa || t.targa_mezzo || '').toUpperCase();
+                    let patente = mezziMap[targaStr] || 'B';
+                    if (patente === 'C') {
+                        tableData[day].giriC++;
+                    } else {
+                        tableData[day].giriB++;
+                    }
+                    tableData[day].colli += q;
+                }
+            }
+            
+            let navetteHeadersHTML = '';
+            navetteConfigurate.forEach(nav => {
+                navetteHeadersHTML += `<th>NAV. ${nav.nome || "NAVETTA"}</th>`;
+            });
+            const theadTr = document.getElementById('standard-summary-thead-tr');
+            theadTr.innerHTML = `
+                <th>DATA</th>
+                <th>GIRI B</th>
+                <th>GIRI C</th>
+                ${navetteHeadersHTML}
+                <th class="col-colli"></th>
+                <th class="col-colli">COLLI</th>
+                <th class="col-totale"></th>
+                <th class="col-totale">totale /gg</th>
+            `;
+
+            const tbody = document.getElementById('standard-summary-tbody');
+            const tfoot = document.getElementById('standard-summary-tfoot');
+            tbody.innerHTML = ''; tfoot.innerHTML = '';
+            
+            let sumB = 0, sumC = 0, sumColli = 0, sumTot = 0;
+            let sumNavette = {};
+            navetteConfigurate.forEach(nav => { sumNavette[nav.nome || "NAVETTA"] = 0; });
+            
+            for (let d = 1; d <= daysInMonth; d++) {
+                const row = tableData[d];
+                let rowNavTot = 0;
+                let navCells = '';
+                
+                navetteConfigurate.forEach(nav => {
+                    let count = row.navetteCounts[nav.nome || "NAVETTA"] || 0;
+                    rowNavTot += count * (nav.tariffa || 0);
+                    sumNavette[nav.nome || "NAVETTA"] += count;
+                    navCells += `<td style="text-align: center;">${count || ''}</td>`;
+                });
+                
+                let rowTotal = (row.giriB * TARIFFA_B) + (row.giriC * TARIFFA_C) + rowNavTot + (row.colli * TARIFFA_COLLO);
+                row.totale = rowTotal;
+                
+                sumB += row.giriB;
+                sumC += row.giriC;
+                sumColli += row.colli;
+                sumTot += row.totale;
+                
+                const formattedDate = `${String(d).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+                
+                let tr = `<tr>
+                    <td>${formattedDate}</td>
+                    <td style="text-align: center;">${row.giriB || ''}</td>
+                    <td style="text-align: center;">${row.giriC || ''}</td>
+                    ${navCells}
+                    <td class="col-colli"></td>
+                    <td class="col-colli" style="text-align: right;">${row.colli > 0 ? row.colli : ''}</td>
+                    <td class="col-totale"></td>
+                    <td class="col-totale" style="text-align: right;">€ ${row.totale.toFixed(2)}</td>
+                </tr>`;
+                tbody.innerHTML += tr;
+            }
+            
+            let navFootCells = '';
+            navetteConfigurate.forEach(nav => {
+                navFootCells += `<th style="text-align: center;">${sumNavette[nav.nome || "NAVETTA"]}</th>`;
+            });
+            let trFoot = `<tr>
+                <th>TOTALE</th>
+                <th style="text-align: center;">${sumB}</th>
+                <th style="text-align: center;">${sumC}</th>
+                ${navFootCells}
+                <th class="col-colli"></th>
+                <th class="col-colli" style="text-align: right;">${sumColli}</th>
+                <th class="col-totale"></th>
+                <th class="col-totale" style="text-align: right;">€ ${sumTot.toFixed(2)}</th>
+            </tr>`;
+            tfoot.innerHTML = trFoot;
+            
+            // Render Recap Table
+            const recapTbody = document.getElementById('standard-recap-tbody');
+            let recapRows = '';
+            navetteConfigurate.forEach(nav => {
+                let name = nav.nome || "NAVETTA";
+                let t = nav.tariffa || 0;
+                let c = sumNavette[name];
+                recapRows += `
+                <tr>
+                    <td>NAVETTA ${name}</td>
+                    <td style="text-align: right;">€ ${t.toFixed(2)}</td>
+                    <td style="text-align: right;">${c}</td>
+                    <td style="text-align: right;">€ ${(t * c).toFixed(2)}</td>
+                </tr>
+                `;
+            });
+            
+            recapTbody.innerHTML = `
+                ${recapRows}
+                <tr>
+                    <td>TRASPORTO B</td>
+                    <td style="text-align: right;">€ ${TARIFFA_B.toFixed(2)}</td>
+                    <td style="text-align: right;">${sumB}</td>
+                    <td style="text-align: right;">€ ${(TARIFFA_B * sumB).toFixed(2)}</td>
+                </tr>
+                <tr>
+                    <td>TRASPORTO C</td>
+                    <td style="text-align: right;">€ ${TARIFFA_C.toFixed(2)}</td>
+                    <td style="text-align: right;">${sumC}</td>
+                    <td style="text-align: right;">€ ${(TARIFFA_C * sumC).toFixed(2)}</td>
+                </tr>
+                <tr id="recap-row-handling" class="col-colli">
+                    <td>HANDLING (COLLI)</td>
+                    <td style="text-align: right;">€ ${TARIFFA_COLLO.toFixed(2)}</td>
+                    <td style="text-align: right;">${sumColli}</td>
+                    <td style="text-align: right;">€ ${(TARIFFA_COLLO * sumColli).toFixed(2)}</td>
+                </tr>
+                <tr id="recap-row-totale" class="col-totale">
+                    <td colspan="3"></td>
+                    <td style="text-align: right; font-weight: bold; background: #f8fafc;">€ ${sumTot.toFixed(2)}</td>
+                </tr>
+            `;
+            
+            window.currentStandardConfig = config;
+            window.currentStandardDays = daysInMonth;
+            window.currentStandardClientName = clientName;
+            window.currentStandardNavetteConfigurate = navetteConfigurate;
+            
+            // Applica stato iniziale toggle
+            window.toggleStandardColumns();
+        }
+
+        window.esportaModuloStandardExcel = function() {
+            if (typeof XLSX === 'undefined') {
+                Swal.fire('Errore', 'Libreria XLSX non trovata.', 'error');
+                return;
+            }
+            
+            const clientName = window.currentStandardClientName || 'Cliente';
+            const config = window.currentStandardConfig || {};
+            const daysInMonth = window.currentStandardDays || 31;
+            const navetteConfigurate = window.currentStandardNavetteConfigurate || [];
+            
+            const TARIFFA_B = config.TARIFFA_B || 0;
+            const TARIFFA_C = config.TARIFFA_C || 0;
+            const TARIFFA_COLLO = config.TARIFFA_COLLO || 0;
+            
+            const showColli = document.getElementById('toggle-colli').checked;
+            const showTotale = document.getElementById('toggle-totale-gg').checked;
+
+            const wb = XLSX.utils.book_new();
+            
+            let headerRow = ["DATA", "GIRI B", "GIRI C"];
+            navetteConfigurate.forEach(nav => {
+                headerRow.push(`NAV. ${nav.nome || "NAVETTA"}`);
+            });
+            if (showColli) { headerRow.push(""); headerRow.push("COLLI"); }
+            if (showTotale) { headerRow.push(""); headerRow.push("totale /gg"); }
+            
+            const ws_data = [headerRow];
+
+            const tbody = document.getElementById('standard-summary-tbody');
+            const rows = tbody.querySelectorAll('tr');
+            
+            rows.forEach((tr) => {
+                let rowData = [];
+                const tds = tr.querySelectorAll('td');
+                
+                rowData.push(tds[0].innerText.trim());
+                rowData.push(parseFloat(tds[1].innerText.trim()) || null);
+                rowData.push(parseFloat(tds[2].innerText.trim()) || null);
+                
+                let tdIdx = 3;
+                navetteConfigurate.forEach(() => {
+                    rowData.push(parseFloat(tds[tdIdx].innerText.trim()) || null);
+                    tdIdx++;
+                });
+                
+                if (showColli) {
+                    rowData.push(null);
+                    rowData.push(parseFloat(tds[tdIdx + 1].innerText.trim()) || null);
+                }
+                if (showTotale) {
+                    rowData.push(null);
+                    rowData.push(0); // Verrà calcolato in Excel
+                }
+                ws_data.push(rowData);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+            let tfootStartR = daysInMonth + 2; 
+            let recapStartR = tfootStartR + 3; // Leave a few blank rows
+            
+            let rIdx = recapStartR;
+            
+            // Mappa per salvare le righe di riepilogo
+            let recapRowsMap = {};
+            navetteConfigurate.forEach(nav => {
+                recapRowsMap[nav.nome || "NAVETTA"] = rIdx++;
+            });
+            let recapRowB = rIdx++;
+            let recapRowC = rIdx++;
+            let recapRowColli = showColli ? rIdx++ : null;
+            let recapRowTotal = showTotale ? rIdx++ : null;
+
+            // Calculate sums in JS to pre-populate the .v field (improves compatibility with mobile/Sheets viewers)
+            let sumB = 0, sumC = 0, sumColli = 0, sumTot = 0;
+            let sumNavette = {};
+            navetteConfigurate.forEach((nav, idx) => {
+                sumNavette[nav.nome || "NAVETTA"] = 0;
+            });
+            
+            let dailyTotals = [];
+            for (let i = 1; i < ws_data.length; i++) {
+                const r = ws_data[i];
+                sumB += r[1] || 0;
+                sumC += r[2] || 0;
+                
+                let rNavTot = 0;
+                let colIdx = 3;
+                navetteConfigurate.forEach((nav) => {
+                    let cVal = r[colIdx] || 0;
+                    sumNavette[nav.nome || "NAVETTA"] += cVal;
+                    rNavTot += cVal * (nav.tariffa || 0);
+                    colIdx++;
+                });
+                
+                let offset = navetteConfigurate.length;
+                let colliVal = showColli ? (r[3 + offset + 1] || 0) : 0;
+                sumColli += colliVal;
+                
+                let rTotal = ((r[1] || 0) * TARIFFA_B) + ((r[2] || 0) * TARIFFA_C) + rNavTot + (colliVal * TARIFFA_COLLO);
+                sumTot += rTotal;
+                dailyTotals.push(rTotal);
+            }
+
+            if (showTotale) {
+                let offset = navetteConfigurate.length;
+                let totaleColIdx = showColli ? (3 + offset + 2) : (3 + offset);
+                let colliFormulaPart = showColli ? `+(${String.fromCharCode(65 + 3 + offset)}`+`${rIdx}*$C$${recapRowColli})` : ``; 
+                
+                for (let i = 0; i < daysInMonth; i++) {
+                    let r = i + 2; 
+                    let cellAddress = XLSX.utils.encode_cell({c: totaleColIdx, r: i + 1});
+                    
+                    let fNav = "";
+                    let fCol = 3;
+                    navetteConfigurate.forEach(nav => {
+                        let cName = String.fromCharCode(65 + fCol);
+                        fNav += `+(${cName}${r}*$C$${recapRowsMap[nav.nome || "NAVETTA"]})`;
+                        fCol++;
+                    });
+                    
+                    ws[cellAddress] = {
+                        t: 'n', 
+                        f: `IFERROR((B${r}*$C$${recapRowB})+(C${r}*$C$${recapRowC})${fNav}${colliFormulaPart}, 0)`,
+                        v: dailyTotals[i] || 0,
+                        z: '"€"\ #,##0.00'
+                    };
+                }
+            }
+
+            let tfootArr = ["TOTALE", sumB || 0, sumC || 0];
+            navetteConfigurate.forEach(nav => {
+                tfootArr.push(sumNavette[nav.nome || "NAVETTA"] || 0);
+            });
+            if(showColli) { tfootArr.push(null); tfootArr.push(sumColli || 0); }
+            if(showTotale) { tfootArr.push(null); tfootArr.push(0); }
+            
+            ws_data.push(tfootArr);
+            XLSX.utils.sheet_add_aoa(ws, [ws_data[ws_data.length - 1]], {origin: {r: tfootStartR - 1, c: 0}});
+            
+            let sumCols = ['B', 'C'];
+            let cL = 3;
+            navetteConfigurate.forEach(() => {
+                sumCols.push(String.fromCharCode(65 + cL));
+                cL++;
+            });
+            if(showColli) sumCols.push(String.fromCharCode(65 + cL + 1));
+            let totaleColChar = showColli ? String.fromCharCode(65 + cL + 3) : String.fromCharCode(65 + cL + 1);
+            if(showTotale) sumCols.push(totaleColChar);
+            
+            sumCols.forEach((col) => {
+                let cIndex = col.charCodeAt(0) - 65; 
+                let cellAddress = XLSX.utils.encode_cell({c: cIndex, r: tfootStartR - 1});
+                
+                let val = 0;
+                if (col === 'B') val = sumB;
+                else if (col === 'C') val = sumC;
+                else if (col === totaleColChar && showTotale) val = sumTot;
+                else if (col === String.fromCharCode(65 + navetteConfigurate.length + 1) && showColli) val = sumColli;
+                else {
+                    let navIdx = col.charCodeAt(0) - 65 - 3;
+                    if (navIdx >= 0 && navIdx < navetteConfigurate.length) {
+                        val = sumNavette[navetteConfigurate[navIdx].nome || "NAVETTA"];
+                    }
+                }
+
+                ws[cellAddress] = {
+                    t: 'n',
+                    f: `SUM(${col}2:${col}${tfootStartR - 1})`,
+                    v: val
+                };
+                if (col === totaleColChar && showTotale) ws[cellAddress].z = '"€"\ #,##0.00';
+            });
+            
+            // Add Recap Data
+            XLSX.utils.sheet_add_aoa(ws, [
+                [],
+                [],
+                ["", "VOCE", "TARIFFA", "QUANTITA'", "IMPORTO"]
+            ], {origin: {r: tfootStartR, c: 0}});
+            
+            // NAVETTE DYNAMIC
+            navetteConfigurate.forEach(nav => {
+                let name = nav.nome || "NAVETTA";
+                let t = nav.tariffa || 0;
+                let rowN = recapRowsMap[name];
+                let qty = sumNavette[name];
+                
+                ws_data.push(["", `NAVETTA ${name}`, t, 0, 0]);
+                XLSX.utils.sheet_add_aoa(ws, [ws_data[ws_data.length - 1]], {origin: {r: rowN - 1, c: 0}});
+                let fCol = String.fromCharCode(65 + 3 + navetteConfigurate.indexOf(nav));
+                ws[XLSX.utils.encode_cell({c: 3, r: rowN - 1})] = { t: 'n', f: `${fCol}${tfootStartR}`, v: qty };
+                ws[XLSX.utils.encode_cell({c: 4, r: rowN - 1})] = { t: 'n', f: `C${rowN}*D${rowN}`, v: t * qty, z: '"€"\ #,##0.00' };
+            });
+
+            // GIRI B
+            ws_data.push(["", "TRASPORTO B", TARIFFA_B, 0, 0]);
+            XLSX.utils.sheet_add_aoa(ws, [ws_data[ws_data.length - 1]], {origin: {r: recapRowB - 1, c: 0}});
+            ws[XLSX.utils.encode_cell({c: 3, r: recapRowB - 1})] = { t: 'n', f: `B${tfootStartR}`, v: sumB };
+            ws[XLSX.utils.encode_cell({c: 4, r: recapRowB - 1})] = { t: 'n', f: `C${recapRowB}*D${recapRowB}`, v: TARIFFA_B * sumB, z: '"€"\ #,##0.00' };
+            
+            // GIRI C
+            ws_data.push(["", "TRASPORTO C", TARIFFA_C, 0, 0]);
+            XLSX.utils.sheet_add_aoa(ws, [ws_data[ws_data.length - 1]], {origin: {r: recapRowC - 1, c: 0}});
+            ws[XLSX.utils.encode_cell({c: 3, r: recapRowC - 1})] = { t: 'n', f: `C${tfootStartR}`, v: sumC };
+            ws[XLSX.utils.encode_cell({c: 4, r: recapRowC - 1})] = { t: 'n', f: `C${recapRowC}*D${recapRowC}`, v: TARIFFA_C * sumC, z: '"€"\ #,##0.00' };
+
+            // COLLI
+            if (showColli) {
+                ws_data.push(["", "HANDLING (COLLI)", TARIFFA_COLLO, 0, 0]);
+                XLSX.utils.sheet_add_aoa(ws, [ws_data[ws_data.length - 1]], {origin: {r: recapRowColli - 1, c: 0}});
+                let colliCol = String.fromCharCode(65 + 3 + navetteConfigurate.length + 1);
+                ws[XLSX.utils.encode_cell({c: 3, r: recapRowColli - 1})] = { t: 'n', f: `${colliCol}${tfootStartR}`, v: sumColli };
+                ws[XLSX.utils.encode_cell({c: 4, r: recapRowColli - 1})] = { t: 'n', f: `C${recapRowColli}*D${recapRowColli}`, v: TARIFFA_COLLO * sumColli, z: '"€"\ #,##0.00' };
+            }
+            
+            // RECAP TOTAL
+            if (showTotale) {
+                ws_data.push(["", "", "", "", 0]);
+                XLSX.utils.sheet_add_aoa(ws, [ws_data[ws_data.length - 1]], {origin: {r: recapRowTotal - 1, c: 0}});
+                
+                let rFirstNav = recapRowsMap[navetteConfigurate[0].nome || "NAVETTA"];
+                let rLast = recapRowC;
+                if(showColli) rLast = recapRowColli;
+                let sumRange = `SUM(E${rFirstNav}:E${rLast})`;
+                ws[XLSX.utils.encode_cell({c: 4, r: recapRowTotal - 1})] = { t: 'n', f: sumRange, v: sumTot, z: '"€"\ #,##0.00' };
+            }
+
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for(let R = range.s.r; R <= range.e.r; ++R) {
+                for(let C = range.s.c; C <= range.e.c; ++C) {
+                    let cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+                    if(!ws[cellAddress]) continue;
+                    if(!ws[cellAddress].s) ws[cellAddress].s = {};
+                    
+                    ws[cellAddress].s.font = { name: "Arial", sz: 11 };
+                    ws[cellAddress].s.border = {
+                        top: {style: 'thin', color: {auto: 1}},
+                        bottom: {style: 'thin', color: {auto: 1}},
+                        left: {style: 'thin', color: {auto: 1}},
+                        right: {style: 'thin', color: {auto: 1}}
+                    };
+                    
+                    if (R === 0) {
+                        ws[cellAddress].s.fill = { fgColor: { rgb: "FFE2EFDA" } };
+                        ws[cellAddress].s.font.bold = true;
+                        ws[cellAddress].s.alignment = { horizontal: "center", vertical: "center" };
+                    } else if (R === tfootStartR - 1) {
+                        ws[cellAddress].s.fill = { fgColor: { rgb: "FFD9E1F2" } };
+                        ws[cellAddress].s.font.bold = true;
+                    }
+                }
+            }
+            
+            let cols = [{wch:15}, {wch:15}, {wch:15}, {wch:20}, {wch:25}];
+            if (showColli) { cols.push({wch:5}); cols.push({wch:15}); }
+            if (showTotale) { cols.push({wch:5}); cols.push({wch:15}); }
+            ws['!cols'] = cols;
+
+            XLSX.utils.book_append_sheet(wb, ws, `Modulo_${clientName}`);
+            let safeMonthLabel = window.currentMonthLabel ? window.currentMonthLabel.replace(/[\\\\/\\\\]/g, '_') : 'mese';
+            XLSX.writeFile(wb, `Fatturazione_${clientName}_${safeMonthLabel}.xlsx`);
+        }
+
+        // --- RIEPILOGO PRESENZE LOGIC ---
+        window.presenzeDataCache = [];
+        
+        window.apriRiepilogoPresenze = async function() {
+            const monthInput = document.getElementById('month-selector').value;
+            const clientSel = document.getElementById('client-selector').value;
+            if (!monthInput) {
+                Swal.fire('Attenzione', 'Seleziona prima un mese di riferimento.', 'warning');
+                return;
+            }
+            
+            let titleText = `(${monthInput})`;
+            if (clientSel && clientSel !== 'TUTTI') {
+                titleText += ` - ${clientSel}`;
+            }
+            document.getElementById('presenzeModalMese').textContent = titleText;
+            document.getElementById('presenzeTableBody').innerHTML = `<tr><td colspan="7" style="text-align: center;">Caricamento in corso...</td></tr>`;
+            document.getElementById('presenzeModal').classList.add('active');
+            
+            try {
+                // Usa le variabili già importate nel modulo (collection, query, where, getDocs, db)
+                
+                const q = query(collection(db, 'presenze'), where('mese', '==', monthInput));
+                const snap = await window.getDocsConFallback(q);
+                
+                window.presenzeDataCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                if (window.presenzeDataCache.length === 0) {
+                    document.getElementById('presenzeTableBody').innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b;">Nessun dato trovato per il mese selezionato.</td></tr>`;
+                } else {
+                    renderPresenzeTable();
+                }
+                
+            } catch (err) {
+                console.error("Errore caricamento presenze:", err);
+                document.getElementById('presenzeTableBody').innerHTML = `<tr><td colspan="7" style="text-align: center; color: red;">Errore nel caricamento dei dati.</td></tr>`;
+            }
+        }
+        
+        window.renderPresenzeTable = function() {
+            const groupSelect = document.getElementById('presenzeGroupSelect').value;
+            const clientSel = document.getElementById('client-selector').value.toUpperCase();
+            const theadGruppo = document.getElementById('presenzeColonnaGruppo');
+            
+            let groupLabel = "Autista";
+            if (groupSelect === 'data') groupLabel = "Data";
+            if (groupSelect === 'cliente') groupLabel = "Cliente";
+            theadGruppo.textContent = groupLabel;
+            
+            const grouped = {};
+            
+            window.presenzeDataCache.forEach(row => {
+                const rowCliente = (row.cliente || "").toUpperCase();
+                if (clientSel !== "TUTTI" && rowCliente !== clientSel) {
+                    return; // Filtra per cliente selezionato nella pagina
+                }
+                
+                let key = "Non specificato";
+                if (groupSelect === 'autista') {
+                    key = row.nomeAutista || row.autistaId || "Sconosciuto";
+                } else if (groupSelect === 'data') {
+                    key = row.data || "Senza data";
+                } else if (groupSelect === 'cliente') {
+                    key = row.cliente || "Senza cliente";
+                }
+                
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        count: 0,
+                        oreOrd: 0,
+                        oreStra: 0,
+                        oreTot: 0,
+                        navetteExtra: 0,
+                        navettePure: 0
+                    };
+                }
+                
+                grouped[key].count += 1;
+                grouped[key].oreOrd += (Number(row.oreOrdinarie) || 0);
+                grouped[key].oreStra += (Number(row.oreStraordinarie) || 0);
+                grouped[key].oreTot += (Number(row.oreTotali) || 0);
+                
+                // Contiamo navette extra (navetta) e navette pure (navettaMissione)
+                if (Array.isArray(row.attivitaAggiuntive)) {
+                    row.attivitaAggiuntive.forEach(att => {
+                        if (att.tipo === 'navetta') grouped[key].navetteExtra += 1;
+                        if (att.tipo === 'navettaMissione') grouped[key].navettePure += 1;
+                    });
+                }
+            });
+            
+            const tbody = document.getElementById('presenzeTableBody');
+            tbody.innerHTML = '';
+            
+            // Ordiniamo alfabeticamente
+            const sortedKeys = Object.keys(grouped).sort();
+            
+            let totTurni = 0, totOrd = 0, totStra = 0, totTot = 0, totNavExtra = 0, totNavPure = 0;
+            
+            sortedKeys.forEach(k => {
+                const data = grouped[k];
+                totTurni += data.count;
+                totOrd += data.oreOrd;
+                totStra += data.oreStra;
+                totTot += data.oreTot;
+                totNavExtra += data.navetteExtra;
+                totNavPure += data.navettePure;
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight: 600;">${k}</td>
+                    <td>${data.count}</td>
+                    <td>${data.oreOrd.toFixed(2)}</td>
+                    <td>${data.oreStra.toFixed(2)}</td>
+                    <td style="font-weight: 600; color: var(--primary);">${data.oreTot.toFixed(2)}</td>
+                    <td>${data.navetteExtra}</td>
+                    <td>${data.navettePure}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            // Riga totali
+            if (sortedKeys.length > 0) {
+                const trTot = document.createElement('tr');
+                trTot.style.backgroundColor = '#f1f5f9';
+                trTot.style.fontWeight = 'bold';
+                trTot.innerHTML = `
+                    <td>TOTALE</td>
+                    <td>${totTurni}</td>
+                    <td>${totOrd.toFixed(2)}</td>
+                    <td>${totStra.toFixed(2)}</td>
+                    <td style="color: var(--primary);">${totTot.toFixed(2)}</td>
+                    <td>${totNavExtra}</td>
+                    <td>${totNavPure}</td>
+                `;
+                tbody.appendChild(trTot);
+            }
+        };
+
+</script>
+

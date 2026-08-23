@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Articoli (Anagrafica) - Log Solution</title>
+    <link rel="stylesheet" href="styles.css?v=6.408">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <style>
+        
+        .list-container { 
+            display: grid; gap: 16px; margin-top:20px; 
+            max-height: 70vh; overflow-y: auto; padding-right: 12px;
+        }
+        .list-container::-webkit-scrollbar { width: 8px; }
+        .list-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .list-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .list-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 20px; }
+        .data-card { border-left: 5px solid #f59e0b; }
+    </style>
+</head>
+<body>
+    <nav class="glass-nav">
+        <div class="nav-content">
+            <button onclick="window.history.back()" class="logout-btn" style="border:none; background:none; cursor:pointer; margin-right:8px; display:flex;">
+                <span class="material-icons-round">arrow_back</span>
+            </button>
+            <div class="nav-title" style="flex: 1;">Gestione Articoli (Anagrafica)</div>
+            <a href="#" onclick="window.logoutFirebase(); return false;" class="logout-btn" title="Esci"><span class="material-icons-round">logout</span></a>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <input type="text" id="searchInput" placeholder="Cerca..." style="flex:1; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <button class="btn-primary" onclick="openModal()" style="border-radius: 12px; padding: 0 20px;">+ Nuovo</button>
+        </div>
+        <div id="loadingIndicator">Caricamento in corso...</div>
+        <div id="dataContainer" class="list-container"></div>
+    </main>
+
+    <!-- Modal Form -->
+    <div id="dataModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px;">Gestione Gestione Articoli (Anagrafica)</h3>
+            <form id="dataForm" class="modal-body" style="display: grid; gap: 15px;">
+                <input type="hidden" id="editId">
+                <div id="dynamicFields" style="display: grid; gap: 15px;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn-primary" style="flex: 2;">Salva</button>
+                    <button type="button" onclick="closeModal()" class="btn-primary" style="flex: 1; background: #f1f5f9; color: #64748b; box-shadow: none;">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { db } from "./core/firebase-init.js";
+        import { getFirestore, collection, doc, addDoc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { firebaseConfig } from "./firebase-config.js";
+
+
+        const COLL_PATH = ['customers', 'DNR', 'anagrafica_articoli'];
+        const FIELDS = ['codice', 'descrizione', 'confezionamento', 'unita_principale', 'unita_secondaria', 'ratio', 'porzioni_unita'];
+        let items = [];
+
+        onSnapshot(collection(db, ...COLL_PATH), { includeMetadataChanges: true }, (snapshot) => {
+            items = [];
+            snapshot.forEach(d => items.push({ id: d.id, ...d.data() }));
+            document.getElementById('loadingIndicator').style.display = 'none';
+            renderTable();
+        });
+
+        document.getElementById('searchInput').addEventListener('input', renderTable);
+
+        window.renderTable = function() {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = items.filter(i => JSON.stringify(i).toLowerCase().includes(q));
+            
+            const html = filtered.map(item => {
+                let details = '';
+                Object.keys(item).forEach(k => {
+                    if(k!=='id') details += <div style="font-size:13px; color:#475569;"><b>\:</b> \</div>;
+                });
+                return 
+                <div class="data-card">
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>\</div>
+                        <div style="display:flex; gap:10px; flex-direction:column;">
+                            <button onclick="editItem('')" style="background:#4f46e5; color:white; border:none; padding:8px; border-radius:8px; cursor:pointer;"><span class="material-icons-round" style="font-size: 16px;">edit</span></button>
+                            <button onclick="deleteItem('')" style="background:#ef4444; color:white; border:none; padding:8px; border-radius:8px; cursor:pointer;"><span class="material-icons-round" style="font-size: 16px;">delete</span></button>
+                        </div>
+                    </div>
+                </div>;
+            }).join('');
+            document.getElementById('dataContainer').innerHTML = html || '<div style="padding: 20px; color: #64748b;">Nessun dato.</div>';
+        }
+
+        window.openModal = function() {
+            document.getElementById('editId').value = '';
+            document.getElementById('dataForm').reset();
+            buildFields({});
+            document.getElementById('dataModal').classList.add('active');
+        }
+
+        window.closeModal = function() {
+            document.getElementById('dataModal').classList.remove('active');
+        }
+
+        window.editItem = function(id) {
+            const item = items.find(i => i.id === id);
+            document.getElementById('editId').value = id;
+            buildFields(item);
+            document.getElementById('dataModal').classList.add('active');
+        }
+
+        window.deleteItem = async function(id) {
+            if(confirm('Eliminare questo elemento?')) {
+                await deleteDoc(doc(db, ...COLL_PATH, id));
+            }
+        }
+
+        function buildFields(item) {
+            const container = document.getElementById('dynamicFields');
+            let html = '';
+            FIELDS.forEach(f => {
+                const val = item[f] || '';
+                html += 
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <label style="font-size:12px; font-weight:bold; color:var(--primary); text-transform:uppercase;">\</label>
+                    <input type="text" id="f_" value="" style="padding:10px; border-radius:8px; border:1px solid #cbd5e1; font-size:14px;">
+                </div>;
+            });
+            container.innerHTML = html;
+        }
+
+        document.getElementById('dataForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editId').value;
+            const data = {};
+            FIELDS.forEach(f => { data[f] = document.getElementById('f_'+f.replace(/[^a-zA-Z0-9]/g, '_')).value; });
+
+            if(id) {
+                await setDoc(doc(db, ...COLL_PATH, id), data, { merge: true });
+            } else {
+                await addDoc(collection(db, ...COLL_PATH), data);
+            }
+            closeModal();
+        });
+    </script>
+</body>
+</html>
+

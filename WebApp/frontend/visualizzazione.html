@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizzazione Dati - Log Solution</title>
+    <link rel="stylesheet" href="styles.css?v=6.408">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    
+    <!-- PWA & Mobile Optimization -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Log Solutions">
+    <link rel="apple-touch-icon" href="img/logo.png">
+    <meta name="theme-color" content="#4f46e5">
+
+    <!-- Leaflet for Map Path -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        .filter-section {
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            margin-bottom: 32px;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .data-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+        }
+
+        .data-card:hover {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            border-color: var(--primary);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+
+        .data-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .data-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .data-value {
+            font-size: 14px;
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        .status-badge {
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        #emptyState {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        /* Animazione spinner per il pulsante Elimina durante l'attesa */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid var(--bg-color);
+            border-bottom-color: var(--primary);
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .filter-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+
+        /* Modal Log Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;
+        }
+        .log-
+.log-table
+.log-table
+#mapModalContent { padding: 0; height: 500px; }
+        #logMap { height: 100%; width: 100%; border-radius: 0 0 20px 20px; }
+    </style>
+</head>
+
+<body class="bg-light">
+    <nav class="glass-nav">
+        <div class="nav-content">
+            <img src="img/logo.png" alt="LS" style="height: 32px; width: auto; margin-right: 8px;">
+            <button id="dashboardBtn" class="logout-btn" title="Dashboard"
+                onclick="window.navigateWithState('dashboard.html')"
+                style="border:none; background:none; cursor:pointer; margin-right:8px; display:flex;">
+                <span class="material-icons-round">dashboard</span>
+            </button>
+            <div class="nav-title" style="flex: 1;">Riepilogo Turni Inseriti</div>
+            <a href="#" onclick="window.logoutFirebase(); return false;" class="logout-btn" title="Esci"><span class="material-icons-round">logout</span></a>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="filter-section">
+            <div class="input-group" style="flex: 1; margin-bottom: 0;">
+                <label>Filtra per Autista</label>
+                <select id="filterAutista">
+                    <option value="tutti">Tutti gli autisti</option>
+                </select>
+            </div>
+            <button id="btnRefresh" class="btn-primary"
+                style="width: auto; padding: 12px 24px; display: flex; align-items: center; gap: 8px;">
+                <span class="material-icons-round">refresh</span>
+                Aggiorna Dati
+            </button>
+        </div>
+
+        <div id="loadingState" style="display: none; text-align: center; padding: 40px;">
+            <span class="loader"></span>
+            <p style="margin-top: 16px;">Caricamento dati dal Foglio Google...</p>
+        </div>
+
+        <div id="listaDati">
+            <!-- Popolato da JS -->
+        </div>
+
+        <div id="emptyState" style="display: none;">
+            <span class="material-icons-round"
+                style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">inventory_2</span>
+            <p>Nessun turno trovato per i criteri selezionati.</p>
+        </div>
+
+        <!-- Modale Log -->
+        <div id="modalLog" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 style="margin:0;"><span class="material-icons-round" style="vertical-align:bottom;">list_alt</span> Log GPS Viaggio</h3>
+                    <button onclick="closeModals()" style="border:none; background:none; cursor:pointer;"><span class="material-icons-round">close</span></button>
+                </div>
+                <div id="logTableContainer">
+                    <!-- Popolato da JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Modale Mappa -->
+        <div id="modalMap" class="modal">
+            <div class="modal-content" id="mapModalContent">
+                <div class="modal-header" style="padding: 16px 24px;">
+                    <h3 style="margin:0;"><span class="material-icons-round" style="vertical-align:bottom;">map</span> Percorso Viaggio</h3>
+                    <button onclick="closeModals()" style="border:none; background:none; cursor:pointer;"><span class="material-icons-round">close</span></button>
+                </div>
+                <div id="logMap"></div>
+            </div>
+        </div>
+    </main>
+
+        <!-- Script base: inizializza window.appData -->
+    <script src="script.js?v=6.408"></script>
+    <!-- Autenticazione Firebase: popola currentUser e chiama onUserProfileLoaded -->
+    <script type="module" src="firebase-auth-sync.js?v=6.408"></script>
+
+    <script type="module">
+        import { getAllTrips, getTripLogs, deleteTrip } from "./firestore-service.js?v=6.408";
+        import { renderTripList, removeTripCard } from "./ui-render.js?v=6.408";
+
+        const filterAutista = document.getElementById('filterAutista');
+        const btnRefresh = document.getElementById('btnRefresh');
+        const loadingState = document.getElementById('loadingState');
+
+        async function loadData() {
+            loadingState.style.display = 'block';
+            try {
+                const autista = filterAutista.value;
+                const trips = await getAllTrips(autista);
+                
+                const userRole = (window.appData?.currentUser?.ruolo || 'autista').toLowerCase();
+                const isAdmin = userRole === 'amministratore' || userRole === 'impiegata';
+                
+                renderTripList(trips, 'listaDati', isAdmin);
+            } catch (error) {
+                console.error("Errore caricamento Firebase:", error);
+                alert("Errore nel caricamento dei dati: " + error.message);
+            } finally {
+                loadingState.style.display = 'none';
+            }
+        }
+
+        // Esposizione funzioni globali per i bottoni nelle card
+        window.loadAndShowLogs = async (tripId) => {
+            const modal = document.getElementById('modalLog');
+            const container = document.getElementById('logTableContainer');
+            container.innerHTML = '<p style="text-align:center;">Recupero log in corso...</p>';
+            modal.classList.add('active');
+
+            try {
+                const logs = await getTripLogs(tripId);
+                if (logs.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; padding: 20px;">Nessun log GPS trovato per questo viaggio.</p>';
+                    return;
+                }
+
+                let html = `<table class="log-table glass-table">
+                    <thead>
+                        <tr>
+                            <th>SEQ</th>
+                            <th>KM</th>
+                            <th>LAT/LNG</th>
+                            <th>ORARIO</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                
+                logs.forEach((log, i) => {
+                    const date = log.timestamp?.toDate ? log.timestamp.toDate() : new Date();
+                    html += `<tr>
+                        <td>${i + 1}</td>
+                        <td>${log.km || '-'}</td>
+                        <td>${log.lat?.toFixed(5)}, ${log.lng?.toFixed(5)}</td>
+                        <td>${date.toLocaleTimeString('it-IT')}</td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = `<p style="color:red; text-align:center;">Errore: ${e.message}</p>`;
+            }
+        };
+
+        let mapInstance = null;
+        let pathLayer = null;
+
+        window.loadAndShowPath = async (tripId) => {
+            const modal = document.getElementById('modalMap');
+            modal.classList.add('active');
+
+            setTimeout(async () => {
+                if (!mapInstance) {
+                    mapInstance = L.map('logMap').setView([45.46427, 9.18951], 10);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap'
+                    }).addTo(mapInstance);
+                }
+
+                if (pathLayer) mapInstance.removeLayer(pathLayer);
+
+                try {
+                    const logs = await getTripLogs(tripId);
+                    if (logs.length === 0) {
+                        alert("Nessun punto GPS valido trovato.");
+                        return;
+                    }
+
+                    const points = logs.map(l => [l.lat, l.lng]);
+                    
+                    if (points.length === 1) {
+                        pathLayer = L.marker(points[0]).addTo(mapInstance);
+                    } else {
+                        pathLayer = L.polyline(points, { color: 'red', weight: 4 }).addTo(mapInstance);
+                    }
+                    
+                    mapInstance.fitBounds(pathLayer.getBounds ? pathLayer.getBounds() : L.latLngBounds(points), { padding: [20, 20] });
+                } catch (e) {
+                    alert("Errore mappa: " + e.message);
+                }
+            }, 300);
+        };
+
+        /**
+         * Elimina un viaggio da Firestore e rimuove la card dalla UI senza ricaricare la pagina.
+         * Accessibile solo ad amministratore e impiegata (il pulsante non viene renderizzato per altri ruoli).
+         *
+         * @param {string}      tripId  - ID del viaggio da eliminare
+         * @param {HTMLElement} btnEl   - Riferimento al pulsante cliccato (per feedback visivo)
+         */
+        window.confirmDeleteTrip = async (tripId, btnEl) => {
+            // Conferma di sicurezza prima di procedere
+            if (!confirm('Sei sicuro di voler eliminare questo viaggio e tutti i suoi log GPS?\nL\'operazione non è reversibile.')) return;
+
+            // Feedback visivo: spinner sul pulsante durante l'operazione
+            if (btnEl) {
+                btnEl.disabled = true;
+                btnEl.innerHTML = '<span class="material-icons-round" style="font-size:18px; animation:spin 1s linear infinite;">sync</span>';
+            }
+
+            try {
+                // Elimina documento viaggio + sottocollezione logs su Firestore
+                await deleteTrip(tripId);
+                console.log(`[UI] Viaggio ${tripId} eliminato da Firestore.`);
+
+                // Rimuove la card dalla DOM con animazione (NON ricarica tutta la lista)
+                removeTripCard(tripId);
+
+            } catch (e) {
+                console.error('[UI] Errore eliminazione viaggio:', e);
+                alert('Errore durante l\'eliminazione: ' + e.message);
+
+                // Ripristina il pulsante in caso di errore
+                if (btnEl) {
+                    btnEl.disabled = false;
+                    btnEl.innerHTML = '<span class="material-icons-round" style="font-size:20px;">delete_outline</span>';
+                }
+            }
+        };
+
+        window.closeModals = () => {
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+        };
+
+        window.onUserProfileLoaded = () => loadData();
+        btnRefresh.onclick = loadData;
+        filterAutista.onchange = loadData;
+
+        window.renderAutistiDropdown = function() {
+            const autisti = window.appData?.lista_autisti || [];
+            const currentVal = filterAutista.value;
+            filterAutista.innerHTML = '<option value="tutti">Tutti gli autisti</option>';
+            autisti.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.nome;
+                opt.textContent = a.nome;
+                filterAutista.appendChild(opt);
+            });
+            filterAutista.value = currentVal;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+             // Caricamento gestito da onUserProfileLoaded (firebase-auth-sync.js)
+        });
+    </script>
+</body>
+</html>
+

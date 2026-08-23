@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centrale Resi - Log Solution</title>
+    <link rel="stylesheet" href="styles.css?v=6.408">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <meta name="theme-color" content="#4f46e5">
+    <style>
+        .tabs { display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; overflow-x: auto; }
+        .tab { padding: 12px 24px; border: none; background: transparent; cursor: pointer; font-weight: 700; font-size: 16px; color: var(--text-muted); border-radius: 8px; transition: 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+        .tab:hover { background: #f8fafc; color: var(--primary); }
+        .tab.active { background: var(--primary); color: white; box-shadow: 0 4px 12px -4px var(--primary-glow); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .resi-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; flex-direction: column; transition: 0.2s; }
+        .resi-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        
+        .resi-img-container { width: 100%; height: 200px; background: #f1f5f9; position: relative; cursor: pointer; }
+        .resi-img-container img { width: 100%; height: 100%; object-fit: cover; }
+        .resi-badge { position: absolute; top: 12px; left: 12px; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; color: white; }
+        .badge-reso { background: #eab308; }
+        .badge-rotto { background: #ef4444; }
+        
+        .resi-content { padding: 16px; display: flex; flex-direction: column; flex: 1; }
+        .resi-header { margin-bottom: 12px; }
+        .resi-title { font-size: 18px; font-weight: 800; color: #0f172a; margin: 0 0 4px 0; }
+        .resi-subtitle { font-size: 14px; color: #64748b; font-weight: 600; display: flex; align-items: center; gap: 4px;}
+        
+        .resi-info { background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; color: #334155; }
+        .resi-info div { margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .resi-info div span:first-child { font-weight: 700; color: #64748b; }
+        .resi-info div span:last-child { font-weight: 600; text-align: right; }
+
+        .resi-actions { display: flex; gap: 8px; margin-top: auto; }
+        .btn-resolve { flex: 1; background: var(--success); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s; }
+        .btn-resolve:hover { filter: brightness(1.1); }
+        .btn-delete { background: #fee2e2; color: #ef4444; border: none; padding: 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .btn-delete:hover { background: #fca5a5; color: white; }
+
+        /* Fullscreen modal for images */
+        .modal-img { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); justify-content: center; align-items: center; }
+        .modal-img.active { display: flex; }
+        .modal-content { max-width: 90%; max-height: 90vh; object-fit: contain; border-radius: 8px; }
+        .modal-close { position: absolute; top: 20px; right: 30px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer; }
+
+        /* Modal Form (per Email) */
+        .modal-content-form { background: white; width: 90%; max-width: 500px; padding: 24px; border-radius: 12px; position: relative; max-height: 90vh; overflow-y: auto; }
+        .modal-close-form { position: absolute; top: 20px; right: 20px; font-size: 24px; font-weight: bold; cursor: pointer; color: #64748b; }
+        .modal-close-form:hover { color: #ef4444; }
+
+        .checkbox-container { position: absolute; top: 12px; right: 12px; background: white; padding: 4px; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10; cursor: pointer; }
+        .checkbox-container input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); }
+        
+        .global-actions { display: flex; gap: 12px; margin-bottom: 20px; }
+    </style>
+</head>
+
+<body>
+    <nav class="glass-nav">
+        <div class="nav-content">
+            <button id="dashboardBtn" class="logout-btn" title="Torna alla Dashboard"
+                onclick="window.navigateWithState('dashboard.html')"
+                style="border:none; background:none; cursor:pointer; margin-right:8px; display:flex;">
+                <span class="material-icons-round">arrow_back</span>
+            </button>
+            <img src="img/logo.png" alt="LS" style="height: 32px; width: auto; margin-right: 8px;">
+            <div class="nav-title" style="flex: 1;">Centrale Resi</div>
+        </div>
+    </nav>
+
+    <div class="main-container" style="padding-top: 80px;">
+        <h1 style="margin-bottom: 24px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 12px;">
+            <span class="material-icons-round" style="font-size: 32px;">assignment_return</span>
+            Gestione Segnalazioni Autisti
+        </h1>
+
+        <div class="tabs" style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; gap:8px;">
+                <button class="tab active" onclick="switchTab('tab-gestire', this)">
+                    <span class="material-icons-round">build_circle</span> Da Lavorare (<span id="countGestire">0</span>)
+                </button>
+                <button class="tab" onclick="switchTab('tab-storico', this)">
+                    <span class="material-icons-round">history</span> Storico
+                </button>
+            </div>
+            <button class="tab" style="padding:8px 12px;" onclick="window.openEmailSettingsModal()" title="Impostazioni Email">
+                <span class="material-icons-round" style="color:var(--primary);">settings</span>
+            </button>
+        </div>
+
+        <div id="tab-gestire" class="tab-content active">
+            <div class="global-actions" id="globalActionsGestire" style="display:none;">
+                <button onclick="window.openEmailSendModal()" style="background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow: 0 4px 6px -1px var(--primary-glow);">
+                    <span class="material-icons-round">mail</span> Invia Email Selezionati (<span id="selectedCount">0</span>)
+                </button>
+            </div>
+            <div id="gridGestire" class="cards-grid">
+                <!-- Cards iniettate via JS -->
+            </div>
+            <div id="emptyGestire" style="display:none; text-align:center; padding: 40px; color: #64748b;">
+                <span class="material-icons-round" style="font-size: 64px; color: #cbd5e1; margin-bottom: 16px;">task_alt</span>
+                <h3>Nessuna anomalia in lavorazione</h3>
+            </div>
+        </div>
+
+        <div id="tab-storico" class="tab-content">
+            <div id="gridStorico" class="cards-grid">
+                <!-- Cards iniettate via JS -->
+            </div>
+            <div id="emptyStorico" style="display:none; text-align:center; padding: 40px; color: #64748b;">
+                <span class="material-icons-round" style="font-size: 64px; color: #cbd5e1; margin-bottom: 16px;">history_toggle_off</span>
+                <h3>Nessun reso nello storico</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal per Zoom Foto -->
+    <div id="imgModal" class="modal-img" onclick="closeModal()">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="imgModalContent" onclick="event.stopPropagation()">
+    </div>
+
+    <!-- Modal Impostazioni Email -->
+    <div id="emailSettingsModal" class="modal-img" onclick="window.closeEmailSettingsModal(event)">
+        <div class="modal-content-form" onclick="event.stopPropagation()">
+            <span class="modal-close-form" onclick="window.closeEmailSettingsModal(event)">&times;</span>
+            <h2 style="margin-top:0; color:var(--primary); display:flex; align-items:center; gap:8px;">
+                <span class="material-icons-round">settings</span> Impostazioni Email
+            </h2>
+            
+            <div class="form-group" style="margin-top: 20px;">
+                <label style="font-weight:700; color:#334155; display:block; margin-bottom:8px;">Email Mittente Predefinita</label>
+                <input type="email" id="emailConfigMittente" style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1; box-sizing:border-box;" placeholder="es. amministrazione@azienda.it (lascia vuoto per default Outlook)">
+            </div>
+            
+            <div class="form-group" style="margin-top: 16px;">
+                <label style="font-weight:700; color:#334155; display:block; margin-bottom:8px;">Testo Base Predefinito</label>
+                <textarea id="emailConfigText" rows="4" style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1; box-sizing:border-box;"></textarea>
+            </div>
+            
+            <div class="form-group" style="margin-top: 16px;">
+                <label style="font-weight:700; color:#334155; display:block; margin-bottom:8px;">Firma Predefinita</label>
+                <textarea id="emailConfigSignature" rows="8" style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1; font-family:monospace; box-sizing:border-box;"></textarea>
+                <small style="color:#64748b;">Il logo aziendale verrà aggiunto automaticamente sotto la firma.</small>
+            </div>
+            
+            <div class="form-group" style="margin-top: 16px;">
+                <label style="font-weight:700; color:#334155; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    Email Clienti
+                    <button onclick="window.addEmailClientRow()" style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:13px; font-weight:bold; display:flex; align-items:center;"><span class="material-icons-round" style="font-size:16px;">add</span> Aggiungi</button>
+                </label>
+                <div id="emailClientsList" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- Rows injected via JS -->
+                </div>
+                <small style="color:#64748b; margin-top:8px; display:block;">Inserisci il Codice Cliente (es. DNR) e l'indirizzo email a cui inviare in automatico i resi.</small>
+            </div>
+            
+            <button onclick="window.saveEmailSettings()" style="width:100%; margin-top:20px; background:var(--primary); color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">Salva Impostazioni</button>
+        </div>
+    </div>
+
+    <!-- Modal Invio Email -->
+    <div id="emailSendModal" class="modal-img" onclick="window.closeEmailSendModal(event)">
+        <div class="modal-content-form" onclick="event.stopPropagation()">
+            <span class="modal-close-form" onclick="window.closeEmailSendModal(event)">&times;</span>
+            <h2 style="margin-top:0; color:var(--primary); display:flex; align-items:center; gap:8px;">
+                <span class="material-icons-round">mail</span> Genera Email Reso
+            </h2>
+            
+            <div class="form-group" style="margin-top: 20px;">
+                <label style="font-weight:700; color:#334155; display:block; margin-bottom:8px;">Aggiunta al Testo (opzionale)</label>
+                <textarea id="emailExtraText" rows="4" style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1; box-sizing:border-box;" placeholder="Es: Si allega foto per vostra opportuna visione..."></textarea>
+            </div>
+            
+            <div class="form-group" style="margin-top: 16px;">
+                <label style="font-weight:700; color:#334155; display:block; margin-bottom:8px;">Destinatari (separati da virgola)</label>
+                <input type="text" id="emailTo" style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1; box-sizing:border-box;">
+            </div>
+
+            <div class="form-group" style="margin-top: 16px;">
+                <label style="font-weight:700; color:#334155; display:block; margin-bottom:8px;">Anteprima Documenti Selezionati</label>
+                <div id="emailDocsPreview" style="background:#f1f5f9; padding:10px; border-radius:8px; font-size:14px; max-height:100px; overflow-y:auto;"></div>
+            </div>
+            
+            <button id="btnGenerateEml" onclick="window.generateAndDownloadEml()" style="width:100%; margin-top:20px; background:var(--success); color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+                <span class="material-icons-round">outgoing_mail</span> Apri in Outlook
+            </button>
+        </div>
+    </div>
+
+    <script src="script.js?v=6.408"></script>
+    <script type="module" src="firebase-auth-sync.js?v=6.408"></script>
+    <script type="module">
+        import { db, app } from "./core/firebase-init.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getStorage, ref, deleteObject, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+        import { firebaseConfig } from "./firebase-config.js";
+
+        const storage = getStorage(app);
+
+        let resiData = [];
+
+        // Tab Switching function - global
+        window.switchTab = function(tabId, btnElement) {
+            document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        };
+
+        // Modal Image - global
+        window.openModal = function(url) {
+            document.getElementById('imgModal').classList.add('active');
+            document.getElementById('imgModalContent').src = url;
+        };
+        window.closeModal = function() {
+            document.getElementById('imgModal').classList.remove('active');
+        };
+
+        // Setup Listener
+        function loadResi() {
+            const tenant = localStorage.getItem('activeTenant') || 'DNR';
+            const resiRef = collection(db, "clienti", tenant, "resi_e_ritiri");
+            const q = query(resiRef, orderBy("timestamp", "desc"));
+            
+            Swal.fire({ title: 'Caricamento...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+                resiData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderResi();
+                Swal.close();
+            }, (error) => {
+                console.error("Errore lettura resi:", error);
+                Swal.fire('Errore', 'Impossibile caricare le segnalazioni', 'error');
+            });
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp) return "";
+            const d = new Date(timestamp);
+            return `${d.toLocaleDateString('it-IT')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        function createCardHTML(r, listType) {
+            const badgeClass = r.tipo_segnalazione === 'merce_rotta' ? 'badge-rotto' : 'badge-reso';
+            const badgeText = r.tipo_segnalazione === 'merce_rotta' ? 'Rottura' : 'Reso';
+            
+            let actionButtons = '';
+            if (listType === 'storico') {
+                actionButtons = `
+                <button class="btn-delete" onclick="window.eliminaReso('${r.id}', '${r.url_foto}')" title="Elimina definitivamente" style="flex: 1;">
+                    <span class="material-icons-round">delete_forever</span> Elimina Record e Foto
+                </button>
+                `;
+            } else if (listType === 'nuovi') {
+                actionButtons = `
+                <button class="btn-resolve" onclick="window.segnaVisto('${r.id}')" style="background:#eab308;">
+                    <span class="material-icons-round">visibility</span> Visto
+                </button>
+                <button class="btn-delete" onclick="window.eliminaReso('${r.id}', '${r.url_foto}')" title="Elimina">
+                    <span class="material-icons-round">delete</span>
+                </button>
+                `;
+            } else if (listType === 'gestire') {
+                actionButtons = `
+                <button class="btn-resolve" onclick="window.risolviReso('${r.id}')">
+                    <span class="material-icons-round">check_circle</span> Segna Risolto
+                </button>
+                <button class="btn-delete" onclick="window.eliminaReso('${r.id}', '${r.url_foto}')" title="Elimina">
+                    <span class="material-icons-round">delete</span>
+                </button>
+                `;
+            }
+
+            return `
+                <div class="resi-card">
+                    <div class="resi-img-container" onclick="window.openModal('${r.url_foto}')">
+                        ${listType === 'gestire' ? `<div class="checkbox-container" onclick="event.stopPropagation()"><input type="checkbox" class="reso-checkbox" value="${r.id}" onchange="window.updateSelection()"></div>` : ''}
+                        <span class="resi-badge ${badgeClass}">${badgeText}</span>
+                        <img src="${r.url_foto}" alt="Foto Reso" loading="lazy">
+                    </div>
+                    <div class="resi-content">
+                        <div class="resi-header">
+                            <h3 class="resi-title">${r.codice_cliente || 'UNK'}</h3>
+                            <div class="resi-subtitle">
+                                <span class="material-icons-round" style="font-size:16px;">storefront</span>
+                                ${r.nome_cliente || 'Sconosciuto'}
+                            </div>
+                        </div>
+                        <div class="resi-info">
+                            <div><span>Data Evento</span> <span>${formatTime(r.timestamp)}</span></div>
+                            <div><span>Autista</span> <span>${r.autista || 'Sconosciuto'}</span></div>
+                        </div>
+                        <div class="resi-actions">
+                            ${actionButtons}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderResi() {
+            const daGestire = resiData.filter(r => !r.letto_da_ufficio);
+            const storico = resiData.filter(r => r.letto_da_ufficio);
+
+            document.getElementById('countGestire').textContent = daGestire.length;
+
+            const gridGestire = document.getElementById('gridGestire');
+            const emptyGestire = document.getElementById('emptyGestire');
+            if (daGestire.length > 0) {
+                gridGestire.innerHTML = daGestire.map(r => {
+                    // Se non è stato ancora "visto", usa le azioni di 'nuovi' (Visto), altrimenti 'gestire' (Segna Risolto)
+                    const type = r.visto_da_ufficio ? 'gestire' : 'nuovi';
+                    return createCardHTML(r, type);
+                }).join('');
+                emptyGestire.style.display = 'none';
+            } else {
+                gridGestire.innerHTML = '';
+                emptyGestire.style.display = 'block';
+            }
+
+            const gridStorico = document.getElementById('gridStorico');
+            const emptyStorico = document.getElementById('emptyStorico');
+            if (storico.length > 0) {
+                gridStorico.innerHTML = storico.map(r => createCardHTML(r, 'storico')).join('');
+                emptyStorico.style.display = 'none';
+            } else {
+                gridStorico.innerHTML = '';
+                emptyStorico.style.display = 'block';
+            }
+        }
+
+        window.segnaVisto = async (id) => {
+            const tenant = localStorage.getItem('activeTenant') || 'DNR';
+            const docRef = doc(db, "clienti", tenant, "resi_e_ritiri", id);
+            try {
+                await updateDoc(docRef, { visto_da_ufficio: true });
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Errore', 'Impossibile aggiornare lo stato', 'error');
+            }
+        };
+
+        window.risolviReso = async (id) => {
+            const tenant = localStorage.getItem('activeTenant') || 'DNR';
+            const docRef = doc(db, "clienti", tenant, "resi_e_ritiri", id);
+            try {
+                await updateDoc(docRef, { letto_da_ufficio: true });
+                // Note: sweetalert toast removed to avoid interrupting workflow, UI updates reactively via onSnapshot
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Errore', 'Impossibile aggiornare lo stato', 'error');
+            }
+        };
+
+        window.eliminaReso = async (id, fotoUrl) => {
+            const res = await Swal.fire({
+                title: 'Eliminare definitivamente?',
+                text: "Il record e la foto verranno cancellati dal database e dallo spazio di archiviazione. L'azione è irreversibile.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Sì, elimina'
+            });
+
+            if (res.isConfirmed) {
+                Swal.fire({ title: 'Eliminazione...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                try {
+                    const tenant = localStorage.getItem('activeTenant') || 'DNR';
+                    
+                    // 1. Delete Photo from Storage if URL exists
+                    if (fotoUrl && fotoUrl.includes('firebasestorage.googleapis.com')) {
+                        try {
+                            const photoRef = ref(storage, fotoUrl);
+                            await deleteObject(photoRef);
+                            console.log("Foto eliminata dallo storage.");
+                        } catch (sErr) {
+                            console.warn("Impossibile eliminare foto storage (forse già cancellata):", sErr);
+                        }
+                    }
+
+                    // 2. Delete Document from Firestore
+                    await deleteDoc(doc(db, "clienti", tenant, "resi_e_ritiri", id));
+                    
+                    Swal.fire('Eliminato!', 'Il record e la foto sono stati rimossi.', 'success');
+                } catch (err) {
+                    console.error(err);
+                    Swal.fire('Errore', 'Impossibile eliminare', 'error');
+                }
+            }
+        };
+
+        // Load data after auth
+        window.onUserProfileLoaded = (user) => {
+            loadResi();
+            loadEmailSettings();
+        };
+
+        // --- GESTIONE SELEZIONE MULTIPLA ---
+        let selectedResi = [];
+        window.updateSelection = () => {
+            const checkboxes = document.querySelectorAll('.reso-checkbox');
+            selectedResi = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+            
+            const globalActions = document.getElementById('globalActionsGestire');
+            const countLabel = document.getElementById('selectedCount');
+            
+            if (selectedResi.length > 0) {
+                globalActions.style.display = 'flex';
+                countLabel.textContent = selectedResi.length;
+            } else {
+                globalActions.style.display = 'none';
+            }
+        };
+
+        // --- GESTIONE IMPOSTAZIONI EMAIL ---
+        let emailSettings = {
+            mittente: "",
+            testoBase: "Buongiorno,\nIn allegato inviamo la documentazione relativa al reso/rottura in oggetto.",
+            firma: "Diego Boschetto\nResponsabile Ufficio amministrativo\nCell: 3491825905\n\nVia A. Volta, 25/A - 35030 Veggiano (PD)\nTel: 0492272224\nP.IVA - CF - Reg. Imp: 04217090168\nREA PD - 446322 - SDI W7YVJK9",
+            clienti: {}
+        };
+        
+        async function loadEmailSettings() {
+            const tenant = localStorage.getItem('activeTenant') || 'DNR';
+            const docRef = doc(db, "clienti", tenant, "configurazioni", "email_settings");
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    emailSettings = { ...emailSettings, ...docSnap.data() };
+                }
+            } catch (err) { console.error("Errore lettura impostazioni email:", err); }
+        }
+
+        window.renderEmailClients = () => {
+            const list = document.getElementById('emailClientsList');
+            list.innerHTML = '';
+            const clients = emailSettings.clienti || {};
+            for (const [code, email] of Object.entries(clients)) {
+                list.insertAdjacentHTML('beforeend', window.createEmailClientRowHTML(code, email));
+            }
+            if (Object.keys(clients).length === 0) {
+                window.addEmailClientRow(); // always show at least one empty row
+            }
+        };
+
+        window.createEmailClientRowHTML = (code = "", email = "") => {
+            return `
+                <div class="email-client-row" style="display:flex; gap:8px; align-items:center;">
+                    <input type="text" class="client-code-input" placeholder="Codice Cliente (es. DNR)" value="${code}" style="flex:1; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
+                    <input type="email" class="client-email-input" placeholder="Email" value="${email}" style="flex:2; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
+                    <button onclick="this.parentElement.remove()" style="background:none; border:none; color:#ef4444; cursor:pointer; display:flex; align-items:center;" title="Rimuovi"><span class="material-icons-round">delete</span></button>
+                </div>
+            `;
+        };
+
+        window.addEmailClientRow = () => {
+            document.getElementById('emailClientsList').insertAdjacentHTML('beforeend', window.createEmailClientRowHTML());
+        };
+
+        window.openEmailSettingsModal = () => {
+            document.getElementById('emailConfigMittente').value = emailSettings.mittente || "";
+            document.getElementById('emailConfigText').value = emailSettings.testoBase || "";
+            document.getElementById('emailConfigSignature').value = emailSettings.firma || "";
+            window.renderEmailClients();
+            document.getElementById('emailSettingsModal').classList.add('active');
+        };
+
+        window.closeEmailSettingsModal = (e) => {
+            if (e) {
+                if(e.target === document.getElementById('emailSettingsModal') || e.target.classList.contains('modal-close-form')) {
+                    document.getElementById('emailSettingsModal').classList.remove('active');
+                }
+            } else {
+                document.getElementById('emailSettingsModal').classList.remove('active');
+            }
+        };
+
+        window.saveEmailSettings = async () => {
+            const mittente = document.getElementById('emailConfigMittente').value;
+            const text = document.getElementById('emailConfigText').value;
+            const signature = document.getElementById('emailConfigSignature').value;
+            
+            let clientiJson = {};
+            const rows = document.querySelectorAll('.email-client-row');
+            rows.forEach(row => {
+                const code = row.querySelector('.client-code-input').value.trim();
+                const email = row.querySelector('.client-email-input').value.trim();
+                if (code && email) {
+                    clientiJson[code] = email;
+                }
+            });
+
+            emailSettings.mittente = mittente;
+            emailSettings.testoBase = text;
+            emailSettings.firma = signature;
+            emailSettings.clienti = clientiJson;
+
+            Swal.fire({ title: 'Salvataggio...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const tenant = localStorage.getItem('activeTenant') || 'DNR';
+                await setDoc(doc(db, "clienti", tenant, "configurazioni", "email_settings"), emailSettings);
+                Swal.fire('Salvato', 'Impostazioni email aggiornate', 'success');
+                window.closeEmailSettingsModal();
+            } catch(err) {
+                Swal.fire('Errore', 'Impossibile salvare le impostazioni', 'error');
+            }
+        };
+
+        // --- GESTIONE INVIO EMAIL EML ---
+        window.openEmailSendModal = () => {
+            if (selectedResi.length === 0) return;
+            
+            const docsPreview = document.getElementById('emailDocsPreview');
+            const selectedDocs = resiData.filter(r => selectedResi.includes(r.id));
+            
+            docsPreview.innerHTML = selectedDocs.map(r => `<div>- ${r.codice_cliente} | ${r.nome_cliente || 'Sconosciuto'} (${formatTime(r.timestamp)})</div>`).join('');
+            
+            // Pre-compila le email destinatari se troviamo i clienti
+            const clientCodes = [...new Set(selectedDocs.map(r => r.codice_cliente).filter(Boolean))];
+            const emails = clientCodes.map(code => emailSettings.clienti[code]).filter(Boolean);
+            document.getElementById('emailTo').value = emails.join(', ');
+            
+            document.getElementById('emailExtraText').value = "";
+            document.getElementById('emailSendModal').classList.add('active');
+        };
+
+        window.closeEmailSendModal = (e) => {
+            if (e) {
+                if(e.target === document.getElementById('emailSendModal') || e.target.classList.contains('modal-close-form')) {
+                    document.getElementById('emailSendModal').classList.remove('active');
+                }
+            } else {
+                document.getElementById('emailSendModal').classList.remove('active');
+            }
+        };
+
+        async function fetchBase64(url) {
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            } catch (err) {
+                console.error("Errore fetchBase64:", err);
+                return null;
+            }
+        }
+
+        window.generateAndDownloadEml = async () => {
+            const btn = document.getElementById('btnGenerateEml');
+            btn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Generazione in corso...';
+            btn.disabled = true;
+
+            try {
+                const to = document.getElementById('emailTo').value;
+                const extraText = document.getElementById('emailExtraText').value;
+                const selectedDocs = resiData.filter(r => selectedResi.includes(r.id));
+                
+                const clientNames = [...new Set(selectedDocs.map(r => r.nome_cliente || r.codice_cliente).filter(Boolean))];
+                const subject = "Segnalazioni Logistiche - " + clientNames.join(", ");
+                
+                // Formatta il body HTML
+                const formattedBaseText = (emailSettings.testoBase || "").replace(/\n/g, "<br>");
+                const formattedExtraText = extraText.replace(/\n/g, "<br>");
+                const formattedSignature = (emailSettings.firma || "").replace(/\n/g, "<br>");
+                
+                // Fetch Logo
+                let logoBase64 = await fetchBase64('img/logo.png');
+
+                // Costruisci Body
+                let bodyHtml = `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+                    ${formattedExtraText ? `<p>${formattedExtraText}</p>` : ''}
+                    <p>${formattedBaseText}</p>
+                    <br><br>
+                    <div style="color:#64748b; font-size: 13px;">
+                        ${formattedSignature}
+                        ${logoBase64 ? `<br><br><img src="cid:logo_img" alt="Logo" style="max-height:60px;">` : ''}
+                    </div>
+                </div>`;
+
+                // Boundary MIME
+                const boundary = "----=_NextPart_" + Date.now().toString(16);
+                
+                const emlLines = [];
+                if (emailSettings.mittente && emailSettings.mittente.trim() !== "") {
+                    emlLines.push(`From: ${emailSettings.mittente.trim()}`);
+                }
+                emlLines.push(`To: ${to}`);
+                emlLines.push(`Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`);
+                emlLines.push(`MIME-Version: 1.0`);
+                emlLines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+                emlLines.push(`X-Unsent: 1`);
+                emlLines.push(``);
+                
+                emlLines.push(`--${boundary}`);
+                emlLines.push(`Content-Type: text/html; charset="UTF-8"`);
+                emlLines.push(`Content-Transfer-Encoding: base64`);
+                emlLines.push(``);
+                emlLines.push(`${btoa(unescape(encodeURIComponent(bodyHtml)))}`);
+
+                // Aggiungi Logo Inline
+                if (logoBase64) {
+                    emlLines.push(``);
+                    emlLines.push(`--${boundary}`);
+                    emlLines.push(`Content-Type: image/png; name="logo.png"`);
+                    emlLines.push(`Content-ID: <logo_img>`);
+                    emlLines.push(`Content-Disposition: inline; filename="logo.png"`);
+                    emlLines.push(`Content-Transfer-Encoding: base64`);
+                    emlLines.push(``);
+                    emlLines.push(`${logoBase64}`);
+                }
+
+                // Processa gli allegati (foto)
+                for (let i = 0; i < selectedDocs.length; i++) {
+                    const doc = selectedDocs[i];
+                    if (doc.url_foto) {
+                        let b64 = await fetchBase64(doc.url_foto);
+                        if (!b64) continue;
+                        
+                        const ext = doc.url_foto.toLowerCase().includes('.png') ? 'png' : 'jpeg';
+                        const filename = `Reso_${doc.codice_cliente || i}_${i+1}.${ext}`;
+                        
+                        emlLines.push(``);
+                        emlLines.push(`--${boundary}`);
+                        emlLines.push(`Content-Type: image/${ext}; name="${filename}"`);
+                        emlLines.push(`Content-Disposition: attachment; filename="${filename}"`);
+                        emlLines.push(`Content-Transfer-Encoding: base64`);
+                        emlLines.push(``);
+                        emlLines.push(`${b64}`);
+                    }
+                }
+
+                // Chiudi MIME
+                emlLines.push(``);
+                emlLines.push(`--${boundary}--`);
+                emlLines.push(``);
+
+                const emlStr = emlLines.join('\r\n');
+
+                // Download EML
+                const blob = new Blob([emlStr], { type: 'message/rfc822' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Email_${Date.now()}.eml`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                window.closeEmailSendModal();
+                
+            } catch (error) {
+                console.error("Errore generazione EML:", error);
+                Swal.fire('Errore', 'Impossibile generare l\'email: ' + error.message, 'error');
+            } finally {
+                btn.innerHTML = '<span class="material-icons-round">outgoing_mail</span> Apri in Outlook';
+                btn.disabled = false;
+            }
+        };
+
+
+    </script>
+</body>
+</html>
+

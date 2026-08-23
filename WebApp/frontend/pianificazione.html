@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pianificazione Viaggi - Log Solution</title>
+    <link rel="stylesheet" href="styles.css?v=6.408">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Colonna Nome Autista fissa (sticky) */
+        .glass-table th:nth-child(2),
+        .glass-table td:nth-child(2) {
+            position: sticky;
+            left: 0;
+            background-color: var(--surface);
+            z-index: 2;
+        }
+        .glass-table th:nth-child(2) {
+            background-color: rgba(248, 250, 252, 0.95);
+            z-index: 3;
+        }
+        .glass-table tr:hover td:nth-child(2) {
+            background-color: rgba(241, 245, 249, 0.95);
+        }
+    </style>
+</head>
+<body>
+    <nav class="glass-nav">
+        <div class="nav-content">
+            <a href="javascript:void(0)" onclick="window.navigateWithState('dashboard.html')" class="back-btn" title="Torna alla Dashboard">
+                <span class="material-icons-round">arrow_back</span>
+            </a>
+            <img src="img/logo.png" alt="LS" style="height: 32px; width: auto; margin-right: 8px;">
+            <div class="nav-title" style="flex: 1; margin-left: 4px;">Pianificazione Viaggi</div>
+            <a href="#" onclick="window.logoutFirebase(); return false;" class="logout-link logout-btn" title="Esci">
+                <span class="material-icons-round">logout</span>
+                Logout
+            </a>
+        </div>
+    </nav>
+
+    <main class="main-container" style="max-width: 1200px; margin: 0 auto; padding-top: 80px;">
+        
+        <!-- Header esclusivo per la stampa -->
+        <div class="print-header" style="display: none;">
+            <h2 style="margin: 0; font-size: 16px;">
+                Pianificazione Viaggi<span id="printWorkingDate"></span> 
+                <span id="printDate" style="font-size:12px; font-weight:normal; margin-left:10px; color:#555;"></span>
+            </h2>
+        </div>
+
+        <div class="filters-container">
+            <div class="input-group" style="flex: 0 1 auto; margin: 0;">
+                <label for="dataPianificazione" style="font-weight: 600; color: var(--text-muted);">Data Pianificazione:</label>
+                <input type="date" id="dataPianificazione" style="width: auto; font-weight: bold; background: var(--input-bg);">
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button id="btnBloccaGiornata" class="btn-primary" style="background-color: #ef4444; width: auto; padding: 10px 16px; display: none;">
+                    <span class="material-icons-round">lock</span>
+                    Blocca Giornata
+                </button>
+                <button id="btnStampa" class="btn-primary" style="background-color: var(--surface); color: var(--text-main); border: 1px solid var(--border); box-shadow: none; width: auto; padding: 10px 16px;" onclick="window.impostaDatiStampaEStampa()">
+                    <span class="material-icons-round">print</span>
+                    Stampa
+                </button>
+                <button id="btnScaricaPdf" class="btn-primary" style="background-color: #f59e0b; width: auto; padding: 10px 16px;" onclick="window.scaricaPDF()">
+                    <span class="material-icons-round">picture_as_pdf</span>
+                    Scarica PDF
+                </button>
+                <button id="btnEsporta" class="btn-primary" style="background-color: #8b5cf6; width: auto; padding: 10px 16px;" onclick="window.esportaInPresenze()">
+                    <span class="material-icons-round">publish</span>
+                    Esporta in Presenze
+                </button>
+                <button id="btnOrdina" class="btn-primary" style="background-color: #3b82f6; width: auto; padding: 10px 16px;" onclick="window.ordinaPerCliente()">
+                    <span class="material-icons-round">sort_by_alpha</span>
+                    Ordina
+                </button>
+                <button id="btnSalva" class="btn-primary" style="width: auto; padding: 10px 24px;">
+                    <span class="material-icons-round">save</span>
+                    Salva Pianificazione
+                </button>
+            </div>
+        </div>
+
+        <div id="alertGiornataBloccata" style="display: none; background: #fee2e2; color: #991b1b; padding: 12px; text-align: center; font-weight: bold; border-radius: 8px; margin: 10px 20px;">
+            <span class="material-icons-round" style="vertical-align: middle; margin-right: 6px;">lock</span>
+            Questa giornata è stata bloccata dall'Amministratore. Non è più possibile apportare modifiche.
+        </div>
+
+        <div id="loadingIndicator" style="text-align: center; padding: 40px; color: #64748b;">
+            <span class="material-icons-round" style="font-size: 48px; animation: spin 1s linear infinite;">autorenew</span>
+            <p style="margin-top: 16px; font-weight: 500;">Inizializzazione Intelligenza Logistica in corso...<br><small>Analisi dello storico presenze e calcolo affinità...</small></p>
+        </div>
+
+        <div class="table-wrapper" id="tableContainer" style="display: none;">
+            <table class="glass-table" id="planningTable">
+                <thead>
+                    <tr>
+                        <th style="width: 3%; text-align: center;"></th>
+                        <th style="width: 20%;">Nome Autista</th>
+                        <th style="width: 25%;">Cliente</th>
+                        <th style="width: 25%;">Zona / Viaggio</th>
+                        <th style="width: 20%;">Targa Mezzo</th>
+                        <th style="width: 5%; text-align: center;">Conf.</th>
+                        <th style="width: 5%;"></th>
+                    </tr>
+                </thead>
+                <tbody id="planningTbody">
+                    <!-- Righe generate da JS -->
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+
+    <!-- Template per le datalist dei suggerimenti -->
+    <div id="datalistsContainer" style="display:none;"></div>
+
+    <script type="module">
+        import { firebaseConfig } from './firebase-config.js';
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getPianificazioneGiorno, salvaPianificazione, bloccaGiornataPianificazione } from "./services/viaggiService.js";
+        import { getAutistiAttivi, getStoricoPresenze } from "./services/dipendentiService.js";
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        window.db = db;
+
+        // Variabili globali per l'intelligenza logistica
+        window.appState = {
+            dipendenti: [],
+            presenzeStorico: [],
+            affinityData: {}, // { dipendenteId: { clienti: {}, viaggi: {}, targhe: {} } }
+            assegnazioniGiorno: new Map(), // dipendenteId => { cliente, viaggio, targa }
+            usatoViaggi: new Set(),
+            usatoTarghe: new Map(),
+            saveInProgress: false
+        };
+
+
+        window.impostaDatiStampaEStampa = function() {
+            const today = new Date();
+            document.getElementById('printDate').innerText = '(Stampato il ' + today.toLocaleDateString('it-IT') + ')';
+            
+            const workDateInput = document.getElementById('dataPianificazione').value;
+            if(workDateInput) {
+                const [y, m, d] = workDateInput.split('-');
+                document.getElementById('printWorkingDate').innerText = ' del ' + `${d}/${m}/${y}`;
+            } else {
+                document.getElementById('printWorkingDate').innerText = '';
+            }
+            window.print();
+        };
+
+        window.scaricaPDF = function() {
+            const today = new Date();
+            document.getElementById('printDate').innerText = '(Stampato il ' + today.toLocaleDateString('it-IT') + ')';
+            
+            let dateStr = 'Generica';
+            const workDateInput = document.getElementById('dataPianificazione').value;
+            if(workDateInput) {
+                const [y, m, d] = workDateInput.split('-');
+                document.getElementById('printWorkingDate').innerText = ' del ' + `${d}/${m}/${y}`;
+                dateStr = `${d}-${m}-${y}`;
+            } else {
+                document.getElementById('printWorkingDate').innerText = '';
+            }
+
+            const element = document.getElementById('tableContainer');
+            const printHeader = document.querySelector('.print-header');
+            
+            // Clona per non rovinare il DOM visibile
+            const clone = document.createElement('div');
+            clone.style.padding = '10px'; // Un po' di margine nel PDF
+            const clonedHeader = printHeader.cloneNode(true);
+            clonedHeader.style.display = 'block';
+            clonedHeader.style.borderBottom = '2px solid #ccc';
+            clonedHeader.style.paddingBottom = '5px';
+            clonedHeader.style.marginBottom = '10px';
+            
+            // Forza il reset degli h2 e span nel clonedHeader per non andare a capo
+            clonedHeader.querySelectorAll('*').forEach(el => el.style.margin = '0');
+
+            clone.appendChild(clonedHeader);
+            
+            const clonedTable = element.cloneNode(true);
+            clonedTable.style.width = '100%';
+            clonedTable.style.fontSize = '11px';
+            
+            // Fix per bug html2canvas con position: sticky
+            clonedTable.querySelectorAll('th, td').forEach(cell => {
+                cell.style.position = 'static';
+            });
+            
+            clone.appendChild(clonedTable);
+
+            // Nasconde roba che non serve in stampa dal clone
+            const rowsToRemove = clone.querySelectorAll('.navetta-row, .magazzino-row');
+            rowsToRemove.forEach(el => el.remove());
+
+            // Rimuovi drag handle e colonne non necessarie (1=drag, 6=conf, 7=azioni)
+            // Rimuovi per posizione nelle righe del clone
+            clone.querySelectorAll('tr').forEach(row => {
+                const cells = row.querySelectorAll('th, td');
+                [6, 5, 0].forEach(idx => { // reverse order per non perdere gli indici
+                    if (cells[idx]) cells[idx].remove();
+                });
+            });
+
+            // Converti tutti i <select> (es. targa, cliente) in span con testo visibile
+            // Nota: cloneNode(true) non copia i valori dinamici, quindi leggiamo dall'originale
+            const originalSelects = element.querySelectorAll('select');
+            const clonedSelects = clone.querySelectorAll('select');
+            originalSelects.forEach((origSel, i) => {
+                const clonedSel = clonedSelects[i];
+                if (clonedSel) {
+                    const val = origSel.options[origSel.selectedIndex]?.text || origSel.value || '-';
+                    const span = document.createElement('span');
+                    span.style.fontWeight = '600';
+                    span.textContent = val;
+                    clonedSel.replaceWith(span);
+                }
+            });
+
+            // Converti anche gli input di testo in span, copiando i valori dinamici dall'originale
+            const originalInputs = element.querySelectorAll('input[type="text"], input:not([type])');
+            const clonedInputs = clone.querySelectorAll('input[type="text"], input:not([type])');
+            originalInputs.forEach((origInp, i) => {
+                const clonedInp = clonedInputs[i];
+                if (clonedInp) {
+                    const span = document.createElement('span');
+                    span.style.fontWeight = '600';
+                    span.textContent = origInp.value || '-';
+                    clonedInp.replaceWith(span);
+                }
+            });
+
+            // Nascondi elementi UI non necessari nel clone
+            clone.querySelectorAll('.drag-handle, .suggest-btn, .suggestion-badge, button, input[type="hidden"]').forEach(el => el.remove());
+
+            const opt = {
+              margin:       10,
+              filename:     `Pianificazione_Viaggi_${dateStr}.pdf`,
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2, useCORS: true },
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            loadingIndicator.style.display = 'flex';
+            html2pdf().set(opt).from(clone).save().then(() => {
+                loadingIndicator.style.display = 'none';
+            }).catch(err => {
+                loadingIndicator.style.display = 'none';
+                Swal.fire('Errore', 'Si è verificato un errore durante la generazione del PDF.', 'error');
+                console.error(err);
+            });
+        };
+
+        window.storicoPresenzeRaw = [];
+        const CLIENTI_CARDINE = ["CATTEL", "GRAN CHEF", "BAUER", "DNR"];
+
+        // Elementi DOM
+        const dataInput = document.getElementById('dataPianificazione');
+        const btnSalva = document.getElementById('btnSalva');
+        const tbody = document.getElementById('planningTbody');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const tableContainer = document.getElementById('tableContainer');
+        const datalistsContainer = document.getElementById('datalistsContainer');
+
+        // Inizializza data a domani di default
+        const domani = new Date();
+        domani.setDate(domani.getDate() + 1);
+        dataInput.value = domani.toISOString().split('T')[0];
+
+        // Helper per estrarre Cliente e Destinazione valida da una stringa
+        function parseClienteDestinazione(stringaUnica) {
+            if (!stringaUnica) return { cliente: "", viaggio: "" };
+            const cleanStr = String(stringaUnica).trim().toUpperCase();
+            
+            // Trova se contiene uno dei clienti cardine
+            let clienteTrovato = "";
+            for (const c of CLIENTI_CARDINE) {
+                if (cleanStr.startsWith(c) || cleanStr.includes(" " + c) || cleanStr.includes(c + " ")) {
+                    clienteTrovato = c;
+                    break;
+                }
+            }
+
+            if (!clienteTrovato) {
+                return { cliente: "", viaggio: cleanStr }; // Fallback
+            }
+
+            // Isola la destinazione togliendo il nome del cliente
+            let resto = cleanStr.replace(clienteTrovato, "").replace(/[^A-Z0-9 ]/g, " ").trim();
+            // Pulisce spazi multipli
+            resto = resto.replace(/\s+/g, " ");
+
+            // Valida la destinazione confrontandola con le impostazioni del cliente
+            const progetti = (window.appData?.lista_clienti_fatturazione?.length > 0) ? window.appData.lista_clienti_fatturazione : (window.appData?.lista_progetti || []);
+            const proj = progetti.find(p => (p.nome || "").toUpperCase() === clienteTrovato);
+            const sourceArray = proj ? (proj.zone_fatturazione ? proj.zone_fatturazione.map(z => z.nome_zona) : (proj.viaggi || proj.destinazioni || [])) : [];
+            const viaggiConfigurati = sourceArray.map(v => String(v).toUpperCase());
+
+            if (viaggiConfigurati.includes(resto)) {
+                return { cliente: clienteTrovato, viaggio: resto };
+            }
+
+            // Se la destinazione estratta non è ufficiale, proviamo a vedere se una delle destinazioni ufficiali è contenuta nel resto
+            const destinazioneUfficiale = viaggiConfigurati.find(v => resto.includes(v) || v.includes(resto));
+            if (destinazioneUfficiale) {
+                return { cliente: clienteTrovato, viaggio: destinazioneUfficiale };
+            }
+
+            // Altrimenti, se non troviamo riscontro ufficiale, lo teniamo comunque come viaggio grezzo
+            return { cliente: clienteTrovato, viaggio: resto || "" };
+        }
+
+        // 1. Caricamento Dati e Calcolo Affinità
+        async function inizializza() {
+            try {
+                // Leggi dipendenti (solo autisti attivi) tramite Service Layer
+                // Leggi dipendenti (solo autisti attivi) tramite Service Layer
+                appState.dipendenti = await getAutistiAttivi();
+
+                // Inizializza mappa affinità
+                appState.dipendenti.forEach(d => {
+                    appState.affinityData[d.id] = { clienti: {}, viaggiPerCliente: {}, viaggi: {}, targhe: {}, clientiPerTarga: {} };
+                });
+
+                // Calcola data limite (il più recente tra 3 mesi fa e il 1 Giugno 2026)
+                const limiteData = new Date();
+                limiteData.setMonth(limiteData.getMonth() - 3);
+                let limiteDataIso = limiteData.toISOString().split('T')[0];
+                if (limiteDataIso < "2026-06-01") {
+                    limiteDataIso = "2026-06-01"; // Filtro hardcoded per escludere sporcizia antecedente
+                }
+
+                // Leggi presenze tramite Service Layer
+                appState.presenzeStorico = await getStoricoPresenze(limiteDataIso);
+
+                // Calcola l'affinità in base al giorno selezionato (se presente)
+                ricalcolaAffinità(dataInput.value);
+
+                // Genera le Datalist
+                generaDatalists();
+
+                // Costruisci la tabella
+                costruisciTabella();
+
+                // Carica la pianificazione del giorno (se c'è)
+                await caricaPianificazione(dataInput.value);
+
+            } catch (err) {
+                console.error("Errore inizializzazione:", err);
+                Swal.fire('Errore', 'Impossibile caricare i dati: ' + err.message, 'error');
+            } finally {
+                loadingIndicator.style.display = 'none';
+                tableContainer.style.display = 'block';
+            }
+        }
+
+        window.ricalcolaAffinità = function(dataIso) {
+            // Svuota i vecchi calcoli
+            appState.dipendenti.forEach(d => {
+                appState.affinityData[d.id] = { clienti: {}, viaggiPerCliente: {}, viaggi: {}, targhe: {}, clientiPerTarga: {} };
+            });
+
+            // Se c'è una data selezionata, calcoliamo il giorno della settimana (0 = domenica, 1 = lunedì, ecc)
+            let giornoTarget = -1;
+            if (dataIso) {
+                giornoTarget = new Date(dataIso).getDay();
+            }
+
+            const processStatDoc = (pd) => {
+                const autistaId = pd.autistaId || pd.dipendenteId;
+                if (!autistaId || !appState.affinityData[autistaId]) return;
+
+                // Se abbiamo un giorno target, consideriamo solo le presenze di quello stesso giorno della settimana
+                if (giornoTarget !== -1 && pd.data) {
+                    const docGiorno = new Date(pd.data).getDay();
+                    if (docGiorno !== giornoTarget) {
+                        return;
+                    }
+                }
+
+                // Estrazione pulita di cliente e viaggio con retrocompatibilità per il vecchio formato accorpato
+                let cliente = (pd.cliente || "").toString().trim().toUpperCase();
+                let viaggio = (pd.viaggio || "").toString().trim().toUpperCase();
+                
+                if (!viaggio && cliente) {
+                    if (cliente.includes(" - ")) {
+                        const parti = cliente.split(" - ");
+                        cliente = parti[0].trim().toUpperCase();
+                        viaggio = parti[1].trim().toUpperCase();
+                    } else {
+                        const parsed = parseClienteDestinazione(cliente);
+                        if (parsed.cliente) {
+                            cliente = parsed.cliente.toUpperCase();
+                            viaggio = parsed.viaggio.toUpperCase();
+                        }
+                    }
+                }
+
+                if (cliente) {
+                    appState.affinityData[autistaId].clienti[cliente] = (appState.affinityData[autistaId].clienti[cliente] || 0) + 1;
+                    
+                    if (viaggio) {
+                        if (!appState.affinityData[autistaId].viaggiPerCliente[cliente]) {
+                            appState.affinityData[autistaId].viaggiPerCliente[cliente] = {};
+                        }
+                        appState.affinityData[autistaId].viaggiPerCliente[cliente][viaggio] = (appState.affinityData[autistaId].viaggiPerCliente[cliente][viaggio] || 0) + 1;
+                    }
+                }
+
+                if (viaggio) {
+                    appState.affinityData[autistaId].viaggi[viaggio] = (appState.affinityData[autistaId].viaggi[viaggio] || 0) + 1;
+                }
+
+                // Estrai targa
+                const targa = (pd.targa || pd.targa_mezzo || pd.mezzo || "").trim().toUpperCase();
+                if (targa && targa.length >= 4) {
+                    appState.affinityData[autistaId].targhe[targa] = (appState.affinityData[autistaId].targhe[targa] || 0) + 1;
+                    if (cliente) {
+                        if (!appState.affinityData[autistaId].clientiPerTarga) {
+                            appState.affinityData[autistaId].clientiPerTarga = {};
+                        }
+                        if (!appState.affinityData[autistaId].clientiPerTarga[targa]) {
+                            appState.affinityData[autistaId].clientiPerTarga[targa] = {};
+                        }
+                        appState.affinityData[autistaId].clientiPerTarga[targa][cliente] = (appState.affinityData[autistaId].clientiPerTarga[targa][cliente] || 0) + 1;
+                    }
+                }
+            };
+
+            appState.presenzeStorico.forEach(p => processStatDoc(p));
+        };
+
+        window.getClienteColorClass = (nome) => {
+            if (!nome) return 'badge-default';
+            const n = nome.toUpperCase();
+            if (n.includes('CATTEL')) return 'badge-cattel';
+            if (n.includes('BAUER')) return 'badge-bauer';
+            if (n.includes('GRAN CHEF')) return 'badge-granchef';
+            if (n.includes('DNR')) return 'badge-dnr';
+            return 'badge-default';
+        };
+
+        window.impostaCliente = function(btn, valore) {
+            const tr = btn.closest('tr');
+            const selectCliente = tr.querySelector('.in-cliente');
+            selectCliente.value = valore;
+            // Esegui trigger dell'input a cascata
+            window.aggiornaDestinazioni(tr, tr.getAttribute('data-id'));
+        };
+
+        window.impostaViaggioGrezzo = function(btn, clientVal, viaggioVal) {
+            const tr = btn.closest('tr');
+            if (clientVal) {
+                const selectCliente = tr.querySelector('.in-cliente');
+                selectCliente.value = clientVal;
+                window.aggiornaDestinazioni(tr, tr.getAttribute('data-id'));
+            }
+            const selectViaggio = tr.querySelector('.in-viaggio');
+            const valUpper = viaggioVal.trim().toUpperCase();
+            let foundOpt = Array.from(selectViaggio.options).find(opt => opt.value.toUpperCase() === valUpper);
+            if (!foundOpt) {
+                foundOpt = Array.from(selectViaggio.options).find(opt => {
+                    const optVal = opt.value.toUpperCase();
+                    return optVal.includes(valUpper) || valUpper.includes(optVal);
+                });
+            }
+            if (foundOpt) {
+                if (foundOpt.disabled) {
+                    Swal.fire('Attenzione', 'Questa Zona è già in uso per questo Cliente.', 'warning');
+                } else {
+                    selectViaggio.value = foundOpt.value;
+                    if (typeof window.aggiornaDisponibilitaGlobale === 'function') window.aggiornaDisponibilitaGlobale();
+                }
+            }
+        };
+
+        window.impostaTargaGrezza = function(btn, clientVal, targaVal) {
+            const tr = btn.closest('tr');
+            if (clientVal && !tr.querySelector('.in-cliente').value) {
+                const selectCliente = tr.querySelector('.in-cliente');
+                selectCliente.value = clientVal;
+                window.aggiornaDestinazioni(tr, tr.getAttribute('data-id'));
+            }
+            const selectTarga = tr.querySelector('.in-targa');
+            if (selectTarga.disabled) {
+                return Swal.fire('Attenzione', 'Seleziona prima il cliente per impostare la targa.', 'warning');
+            }
+            // Imposta valore targa
+            const valUpper = targaVal.trim().toUpperCase();
+            let foundOpt = Array.from(selectTarga.options).find(opt => opt.value.toUpperCase() === valUpper);
+            if (!foundOpt) {
+                foundOpt = Array.from(selectTarga.options).find(opt => {
+                    const optVal = opt.value.toUpperCase();
+                    return optVal.includes(valUpper) || valUpper.includes(optVal);
+                });
+            }
+            if (foundOpt) {
+                if (foundOpt.disabled) {
+                    Swal.fire('Attenzione', 'Questa Targa è già in uso da un altro autista.', 'warning');
+                } else {
+                    selectTarga.value = foundOpt.value;
+                    if (typeof window.aggiornaDisponibilitaGlobale === 'function') window.aggiornaDisponibilitaGlobale();
+                }
+            }
+        };
+
+        window.impostaDaSuggerimento = function(btn, selector, valore) {
+            const tr = btn.closest('tr');
+            const targetEl = tr.querySelector(selector);
+            if (targetEl) {
+                const valUpper = valore.trim().toUpperCase();
+                
+                // Se il target è un select, proviamo a trovare l'opzione che corrisponde meglio
+                if (targetEl.tagName === 'SELECT') {
+                    // Cerca prima una corrispondenza esatta
+                    let foundOpt = Array.from(targetEl.options).find(opt => opt.value.toUpperCase() === valUpper);
+                    if (!foundOpt) {
+                        // Cerca una corrispondenza parziale (es. "SIRMIONE" corrisponde a "LAGO SIRMIONE")
+                        foundOpt = Array.from(targetEl.options).find(opt => {
+                            const optVal = opt.value.toUpperCase();
+                            return optVal.includes(valUpper) || valUpper.includes(optVal);
+                        });
+                    }
+                    if (foundOpt) {
+                        if (foundOpt.disabled) {
+                            Swal.fire('Attenzione', 'Questa opzione è già in uso da un altro autista.', 'warning');
+                        } else {
+                            targetEl.value = foundOpt.value;
+                            if (typeof window.aggiornaDisponibilitaGlobale === 'function') window.aggiornaDisponibilitaGlobale();
+                        }
+                    }
+                } else {
+                    targetEl.value = valore;
+                }
+                
+                // Se abbiamo impostato il cliente da suggerimento, aggiorniamo anche le destinazioni
+                if (selector === '.in-cliente') {
+                    window.aggiornaDestinazioni(tr, tr.getAttribute('data-id'));
+                }
+            }
+        };
+
+        window.renderProgetti = function() {
+            console.log("Pianificazione: renderProgetti() chiamato, aggiornamento menu clienti...");
+            const progetti = (window.appData?.lista_clienti_fatturazione?.length > 0) ? window.appData.lista_clienti_fatturazione : (window.appData?.lista_progetti || []);
+            
+            const selects = document.querySelectorAll('.in-cliente');
+            selects.forEach(select => {
+                const tr = select.closest('tr');
+                const autistaId = tr.getAttribute('data-id');
+                const currentVal = select.value || tr.dataset.pendingCliente || "";
+                
+                select.innerHTML = '<option value="">-- Seleziona --</option>';
+                progetti.forEach(p => {
+                    const nome = (p.nome || "").trim().toUpperCase();
+                    const opt = document.createElement('option');
+                    opt.value = nome;
+                    opt.textContent = nome;
+                    select.appendChild(opt);
+                });
+                
+                const navOpt = document.createElement('option');
+                navOpt.value = 'NAVETTA'; navOpt.textContent = '🚐 NAVETTA';
+                select.appendChild(navOpt);
+                
+                const magOpt = document.createElement('option');
+                magOpt.value = 'MAGAZZINO'; magOpt.textContent = '📦 MAGAZZINO';
+                select.appendChild(magOpt);
+                select.value = currentVal;
+                if (select.value === currentVal) {
+                    delete tr.dataset.pendingCliente;
+                }
+                
+                window.aggiornaDestinazioni(tr, autistaId);
+            });
+        };
+
+        window.renderMezzi = function() {
+            console.log("Pianificazione: renderMezzi() chiamato, aggiornamento menu targhe...");
+            const mezzi = window.appData?.lista_mezzi || [];
+            
+            const selects = document.querySelectorAll('.in-targa');
+            selects.forEach(select => {
+                const tr = select.closest('tr');
+                const currentVal = select.value || tr.dataset.pendingTarga || "";
+                
+                select.innerHTML = '<option value="">-- Seleziona --</option>';
+                 mezzi.filter(m => m.attivo !== false && m.inUso !== false)
+                      .sort((a,b) => a.targa.localeCompare(b.targa))
+                      .forEach(m => {
+                    const targa = (m.targa || "").trim().toUpperCase();
+                    const pat = m.patente ? ` - ${m.patente}` : '';
+                    const modelloPulito = m.modello && m.modello !== 'undefined' && m.modello !== 'null' ? m.modello.trim() : '';
+                    const mod = modelloPulito ? ` (${modelloPulito})` : '';
+                    const opt = document.createElement('option');
+                    opt.value = targa;
+                    opt.textContent = targa + pat + mod;
+                    select.appendChild(opt);
+                });
+                select.value = currentVal;
+                if (select.value === currentVal) {
+                    delete tr.dataset.pendingTarga;
+                }
+            });
+            
+            // Applica il filtro delle disponibilità appena terminato di renderizzare tutte le targhe
+            if (typeof window.aggiornaDisponibilitaGlobale === 'function') window.aggiornaDisponibilitaGlobale();
+        };
+
+        window.aggiornaDestinazioni = function(tr, idAutista, skipGlobalUpdate = false) {
+            const selectCliente = tr.querySelector('.in-cliente');
+            const clienteSelezionato = selectCliente.value.trim().toUpperCase();
+            const destContainer = tr.querySelector('.dest-container');
+            const selectViaggio = tr.querySelector('.in-viaggio');
+            const selectTarga = tr.querySelector('.in-targa');
+            
+            // Salva valore viaggio corrente o recupera quello in caricamento
+            const currentViaggio = selectViaggio.value || tr.dataset.pendingViaggio || "";
+ 
+            // Aggiorna opzioni select viaggio per questa riga
+            selectViaggio.innerHTML = '<option value="">-- Seleziona --</option>';
+            
+            let viaggiConfigurati = [];
+            if (clienteSelezionato === 'NAVETTA') {
+                viaggiConfigurati = (window.appData?.lista_navetta_partenze || []).map(p => p.nome);
+            } else if (clienteSelezionato === 'MAGAZZINO') {
+                viaggiConfigurati = (window.appData?.lista_magazzini_sedi || []).map(s => s.nome);
+            } else {
+                const progetti = (window.appData?.lista_clienti_fatturazione?.length > 0) ? window.appData.lista_clienti_fatturazione : (window.appData?.lista_progetti || []);
+                const proj = progetti.find(p => (p.nome || "").toUpperCase() === clienteSelezionato);
+                viaggiConfigurati = proj ? (proj.zone_fatturazione ? proj.zone_fatturazione.map(z => z.nome_zona) : (proj.viaggi || proj.destinazioni || [])) : [];
+            }
+            viaggiConfigurati.forEach(v => {
+                if(!v) return;
+                const opt = document.createElement('option');
+                const vUpper = String(v).trim().toUpperCase();
+                opt.value = vUpper;
+                opt.textContent = vUpper;
+                selectViaggio.appendChild(opt);
+            });
+ 
+            // Ripristina valore viaggio se valido
+            selectViaggio.value = currentViaggio;
+            if (selectViaggio.value === currentViaggio) {
+                delete tr.dataset.pendingViaggio;
+            }
+ 
+            if (!clienteSelezionato) {
+                selectViaggio.value = '';
+                selectViaggio.disabled = true;
+                selectTarga.value = '';
+                selectTarga.disabled = true;
+                destContainer.innerHTML = tr.dataset.generalViaggi || '<span class="suggestion-badge badge-disabled">Seleziona prima il cliente</span>';
+                if (!skipGlobalUpdate && typeof window.aggiornaDisponibilitaGlobale === 'function') window.aggiornaDisponibilitaGlobale();
+                return;
+            }
+ 
+            const isConfirmed = tr.querySelector('.in-confermato')?.checked || false;
+            selectViaggio.disabled = isConfirmed;
+            selectTarga.disabled = isConfirmed;
+            const colorClass = window.getClienteColorClass(clienteSelezionato);
+            const viaggiCliente = appState.affinityData[idAutista].viaggiPerCliente[clienteSelezionato] || {};
+            const topViaggi = Object.entries(viaggiCliente).sort((a,b) => b[1] - a[1]).slice(0, 3);
+ 
+            if (topViaggi.length === 0) {
+                destContainer.innerHTML = `<span class="suggestion-badge ${colorClass}" style="opacity: 0.6;">Nessuno storico destinazioni</span>`;
+            } else {
+                destContainer.innerHTML = topViaggi.map(v => 
+                    `<span class="suggestion-badge ${colorClass}" style="cursor:pointer;" onclick="impostaDaSuggerimento(this, '.in-viaggio', '${v[0].replace(/'/g, "\\'")}')" title="Usato ${v[1]} volte">★ ${v[0]} (${v[1]})</span>`
+                ).join(' ');
+            }
+            if (typeof window.aggiornaDisponibilitaGlobale === 'function') window.aggiornaDisponibilitaGlobale();
+        };
+
+        window.aggiornaDisponibilitaGlobale = function() {
+            appState.usatoViaggi.clear();
+            appState.usatoTarghe.clear();
+
+            const righe = document.querySelectorAll('#planningTable tbody tr');
+            
+            // 1. Fase di Lettura Rapida
+            righe.forEach(tr => {
+                if (tr.id === 'no-data-row') return;
+                const autistaId = tr.getAttribute('data-id');
+                const cliente = tr.querySelector('.in-cliente')?.value.trim().toUpperCase() || "";
+                const viaggio = tr.querySelector('.in-viaggio')?.value.trim().toUpperCase() || "";
+                const targa = tr.querySelector('.in-targa')?.value.trim().toUpperCase() || "";
+
+                if (cliente && viaggio) appState.usatoViaggi.add(cliente + "||" + viaggio);
+                if (targa) appState.usatoTarghe.set(targa, autistaId);
+            });
+
+            // 2. Fase di Scrittura (Nascondi opzioni occupate senza distruggere il DOM)
+            righe.forEach(tr => {
+                if (tr.id === 'no-data-row') return;
+                const autistaId = tr.getAttribute('data-id');
+                
+                const currentCliente = tr.querySelector('.in-cliente')?.value.trim().toUpperCase() || "";
+                const selectViaggio = tr.querySelector('.in-viaggio');
+                const selectTarga = tr.querySelector('.in-targa');
+                
+                if (selectViaggio && currentCliente) {
+                    Array.from(selectViaggio.options).forEach(opt => {
+                        if(!opt.value) return;
+                        const combo = currentCliente + "||" + opt.value;
+                        const isSpecialCliente = currentCliente === 'NAVETTA' || currentCliente === 'MAGAZZINO';
+                        
+                        if (!isSpecialCliente && appState.usatoViaggi.has(combo) && opt.value !== selectViaggio.value) {
+                            opt.style.display = 'none';
+                            opt.disabled = true;
+                        } else {
+                            opt.style.display = '';
+                            opt.disabled = false;
+                        }
+                    });
+                }
+
+                if (selectTarga) {
+                    Array.from(selectTarga.options).forEach(opt => {
+                        if(!opt.value) return;
+                        const owner = appState.usatoTarghe.get(opt.value);
+                        const isUsedByOther = (owner && owner !== autistaId);
+                        
+                        if (isUsedByOther) {
+                            opt.style.display = 'none';
+                            opt.disabled = true;
+                        } else {
+                            opt.style.display = '';
+                            opt.disabled = false;
+                        }
+                    });
+                }
+            });
+        };
+
+        window.toggleLockRow = (tr) => {
+            const isConfirmed = tr.querySelector('.in-confermato').checked;
+            const inputs = tr.querySelectorAll('.input-field');
+            const badges = tr.querySelectorAll('.suggestion-badge');
+            const pulisciBtn = tr.querySelector('.btn-pulisci');
+            
+            inputs.forEach(inp => {
+                inp.disabled = isConfirmed;
+                if(isConfirmed) inp.style.backgroundColor = '#f1f5f9';
+                else inp.style.backgroundColor = '';
+            });
+            
+            pulisciBtn.disabled = isConfirmed;
+            
+            if(isConfirmed) {
+                tr.style.backgroundColor = '#f0fdf4';
+                badges.forEach(b => {
+                    b.dataset.oldEvents = b.style.pointerEvents;
+                    b.style.pointerEvents = 'none';
+                    b.style.opacity = '0.5';
+                });
+            } else {
+                tr.style.backgroundColor = '';
+                badges.forEach(b => {
+                    b.style.pointerEvents = b.dataset.oldEvents || '';
+                    b.style.opacity = '1';
+                });
+            }
+        };
+
+        function generaDatalists() {
+            let html = '';
+            
+            // Datalist Globale Clienti censiti nelle impostazioni
+            html += `<datalist id="clienti_globali">`;
+            const progetti = (window.appData?.lista_clienti_fatturazione?.length > 0) ? window.appData.lista_clienti_fatturazione : (window.appData?.lista_progetti || []);
+            progetti.forEach(p => {
+                if (!p.nome) return;
+                html += `<option value="${p.nome.toUpperCase()}">${p.nome}</option>`;
+            });
+            html += `</datalist>`;
+
+            appState.dipendenti.forEach(d => {
+                 const mezziAttivi = window.appData?.lista_mezzi?.filter(m => m.attivo !== false && m.inUso !== false).map(m => (m.targa || "").trim().toUpperCase()) || [];
+                const targheSortate = Object.entries(appState.affinityData[d.id].targhe)
+                                            .filter(t => mezziAttivi.includes(t[0].toUpperCase()))
+                                            .sort((a,b) => b[1] - a[1]);
+
+                // Datalist dinamico per viaggi di questa riga (inizialmente vuoto)
+                html += `<datalist id="viaggi_dinamici_${d.id}"></datalist>`;
+
+                html += `<datalist id="targhe_${d.id}">`;
+                targheSortate.forEach(t => {
+                    html += `<option value="${t[0]}">Affinità: ${t[1]} volte</option>`;
+                });
+                html += `</datalist>`;
+            });
+            datalistsContainer.innerHTML = html;
+        }
+
+        function costruisciTabella() {
+            tbody.innerHTML = '';
+            
+            // Carica la lista progetti corrente per popolare il select cliente
+            const progetti = (window.appData?.lista_clienti_fatturazione?.length > 0) ? window.appData.lista_clienti_fatturazione : (window.appData?.lista_progetti || []);
+            let opzioniClientiHtml = progetti.map(p => {
+                const nome = (p.nome || "").trim().toUpperCase();
+                return `<option value="${nome}">${nome}</option>`;
+            }).join('');
+            
+            opzioniClientiHtml += `<option value="NAVETTA">🚐 NAVETTA</option>`;
+            opzioniClientiHtml += `<option value="MAGAZZINO">📦 MAGAZZINO</option>`;
+
+             // Carica la lista mezzi corrente per popolare il select targa (solo attivi in pianificazione ed in uso)
+             const mezzi = (window.appData?.lista_mezzi || []).filter(m => m.attivo !== false && m.inUso !== false);
+             const opzioniTargheHtml = [...mezzi].sort((a,b) => a.targa.localeCompare(b.targa)).map(m => {
+                const targa = (m.targa || "").trim().toUpperCase();
+                const pat = m.patente ? ` - ${m.patente}` : '';
+                const modelloPulito = m.modello && m.modello !== 'undefined' && m.modello !== 'null' ? m.modello.trim() : '';
+                const mod = modelloPulito ? ` (${modelloPulito})` : '';
+                return `<option value="${targa}">${targa}${pat}${mod}</option>`;
+            }).join('');
+
+            appState.dipendenti.forEach(d => {
+                const topClienti = Object.entries(appState.affinityData[d.id].clienti).sort((a,b) => b[1] - a[1]).slice(0, 3);
+                const topViaggi = Object.entries(appState.affinityData[d.id].viaggi).sort((a,b) => b[1] - a[1]).slice(0, 3);
+                const topTarghe = Object.entries(appState.affinityData[d.id].targhe).sort((a,b) => b[1] - a[1]).slice(0, 2);
+                
+                let suggestClienteHtml = topClienti.length > 0 
+                    ? topClienti.map(c => `<span class="suggestion-badge ${window.getClienteColorClass(c[0])}" style="cursor:pointer;" onclick="impostaCliente(this, '${c[0].replace(/'/g, "\\'")}')" title="Assegnato ${c[1]} volte">★ ${c[0]} (${c[1]})</span>`).join(' ') 
+                    : '';
+                let suggestTargaHtml = topTarghe.length > 0 
+                    ? topTarghe.map(t => {
+                    let clientAssociato = "";
+                    const clientiTarga = appState.affinityData[d.id].clientiPerTarga?.[t[0]] || {};
+                    const topClientiTarga = Object.entries(clientiTarga).sort((a,b) => b[1] - a[1]);
+                        if (topClientiTarga.length > 0) {
+                            clientAssociato = topClientiTarga[0][0];
+                        }
+                        return `<span class="suggestion-badge" style="cursor:pointer;" onclick="window.impostaTargaGrezza(this, '${clientAssociato.replace(/'/g, "\\'")}', '${t[0].replace(/'/g, "\\'")}')" title="Usato ${t[1]} volte">★ ${t[0]} (${t[1]})</span>`;
+                    }).join(' ') 
+                    : '';
+                let suggestViaggioHtml = topViaggi.length > 0 
+                    ? topViaggi.map(v => {
+                        let clientAssociato = "";
+                        for (const [c, viaggiMap] of Object.entries(appState.affinityData[d.id].viaggiPerCliente)) {
+                            if (viaggiMap[v[0]]) {
+                                clientAssociato = c;
+                                break;
+                            }
+                        }
+                        const colorClass = window.getClienteColorClass(clientAssociato);
+                        return `<span class="suggestion-badge ${colorClass}" style="cursor:pointer;" onclick="window.impostaViaggioGrezzo(this, '${clientAssociato.replace(/'/g, "\\'")}', '${v[0].replace(/'/g, "\\'")}')" title="Usato ${v[1]} volte">★ ${v[0]} (${v[1]})</span>`;
+                    }).join(' ') 
+                    : '';
+
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-id', d.id);
+                tr.dataset.generalViaggi = suggestViaggioHtml;
+                tr.innerHTML = `
+                    <td style="text-align: center;">
+                        <span class="material-icons-round drag-handle" title="Trascina per riordinare">drag_indicator</span>
+                    </td>
+                    <td>
+                        <div class="driver-name">${d.nome} ${d.cognome || ''}</div>
+                    </td>
+                    <td>
+                        <select class="input-field in-cliente">
+                            <option value="">-- Seleziona --</option>
+                            ${opzioniClientiHtml}
+                        </select>
+                        <div class="no-print" style="margin-top: 6px; display:flex; gap:6px; flex-wrap:wrap;">${suggestClienteHtml}</div>
+                    </td>
+                    <td>
+                        <select class="input-field in-viaggio" disabled>
+                            <option value="">-- Seleziona --</option>
+                        </select>
+                        <div class="dest-container no-print" style="margin-top: 6px; display:flex; gap:6px; flex-wrap:wrap;">
+                             ${suggestViaggioHtml || '<span class="suggestion-badge badge-disabled">Seleziona prima il cliente</span>'}
+                        </div>
+                    </td>
+                    <td>
+                        <select class="input-field in-targa" disabled>
+                            <option value="">-- Seleziona --</option>
+                            ${opzioniTargheHtml}
+                        </select>
+                        <div class="no-print" style="margin-top: 6px; display:flex; gap:6px; flex-wrap:wrap;">${suggestTargaHtml}</div>
+                    </td>
+                    <td class="check-container">
+                        <input type="checkbox" class="in-confermato" title="Spunta per segnare come confermato">
+                    </td>
+                    <td style="text-align:center;">
+                        <button class="icon-btn btn-pulisci" onclick="pulisciRiga('${d.id}')" title="Svuota riga" style="background:none; border:none; color:#94a3b8; cursor:pointer;">
+                            <span class="material-icons-round">clear</span>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            // Inizializza SortableJS sul tbody
+            if (window.planningSortable) {
+                window.planningSortable.destroy();
+            }
+            window.planningSortable = Sortable.create(tbody, {
+                handle: '.drag-handle',
+                animation: 150,
+                ghostClass: 'sortable-ghost'
+            });
+        }
+
+        window.ordinaPerCliente = () => {
+            const tbody = document.getElementById('planningTbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            rows.sort((a, b) => {
+                const clienteA = a.querySelector('.in-cliente').value.trim().toUpperCase();
+                const clienteB = b.querySelector('.in-cliente').value.trim().toUpperCase();
+                
+                if (clienteA && !clienteB) return -1;
+                if (!clienteA && clienteB) return 1;
+                if (clienteA < clienteB) return -1;
+                if (clienteA > clienteB) return 1;
+                
+                const viaggioA = a.querySelector('.in-viaggio').value.trim().toUpperCase();
+                const viaggioB = b.querySelector('.in-viaggio').value.trim().toUpperCase();
+                
+                if (viaggioA && !viaggioB) return -1;
+                if (!viaggioA && viaggioB) return 1;
+                if (viaggioA < viaggioB) return -1;
+                if (viaggioA > viaggioB) return 1;
+                
+                const nomeA = a.querySelector('.driver-name').innerText.trim().toUpperCase();
+                const nomeB = b.querySelector('.driver-name').innerText.trim().toUpperCase();
+                if (nomeA < nomeB) return -1;
+                if (nomeA > nomeB) return 1;
+                
+                return 0;
+            });
+            
+            rows.forEach(row => tbody.appendChild(row));
+            
+            Swal.fire({
+                title: 'Ordinato!',
+                text: 'Le righe sono state ordinate alfabeticamente per Cliente, Viaggio e Autista.',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        };
+
+        window.pulisciRiga = (id) => {
+            const tr = document.querySelector(`tr[data-id="${id}"]`);
+            if(tr) {
+                tr.querySelector('.in-cliente').value = '';
+                tr.querySelector('.in-viaggio').value = '';
+                tr.querySelector('.in-targa').value = '';
+                tr.querySelector('.in-confermato').checked = false;
+                window.aggiornaDestinazioni(tr, id);
+                window.toggleLockRow(tr);
+            }
+        };
+
+        // 2. Caricamento Pianificazione per data
+        async function caricaPianificazione(dataIso) {
+            if (!dataIso) return;
+            
+            // Svuotiamo prima la UI e puliamo i dataset pendenti
+            document.querySelectorAll('#planningTable tbody tr').forEach(tr => {
+                const id = tr.getAttribute('data-id');
+                const emp = appState.dipendenti.find(d => d.id === id);
+                if(emp && emp.data_licenziamento && emp.data_licenziamento < dataIso) {
+                    tr.style.display = 'none';
+                } else {
+                    tr.style.display = '';
+                }
+
+                delete tr.dataset.pendingCliente;
+                delete tr.dataset.pendingViaggio;
+                delete tr.dataset.pendingTarga;
+                
+                tr.querySelector('.in-cliente').value = '';
+                tr.querySelector('.in-viaggio').value = '';
+                tr.querySelector('.in-targa').value = '';
+                tr.querySelector('.in-confermato').checked = false;
+                window.aggiornaDestinazioni(tr, tr.getAttribute('data-id'), true);
+                window.toggleLockRow(tr);
+            });
+
+            try {
+                const data = await getPianificazioneGiorno("DNR", dataIso);
+                
+                if (data) {
+                    window.currentGiornataBloccata = data.isBloccato || false;
+                    applicaStatoBlocco(window.currentGiornataBloccata);
+
+                    if (data.assegnazioni) {
+                        data.assegnazioni.forEach(ass => {
+                            const tr = document.querySelector(`tr[data-id="${ass.dipendenteId}"]`);
+                            if (tr) {
+                                // Retrocompatibilità: se nel vecchio db c'era solo ass.viaggio (senza ass.cliente)
+                                let clientVal = ass.cliente || "";
+                                let destVal = ass.viaggio || "";
+
+                                if (!clientVal && destVal) {
+                                    // Fai il parsing al volo per metterli nei rispettivi campi UI
+                                    const parsed = parseClienteDestinazione(destVal);
+                                    clientVal = parsed.cliente;
+                                    destVal = parsed.viaggio || destVal; // tieni destVal se scartato
+                                }
+
+                                // Salva in dataset per evitare race conditions se i progetti/mezzi caricano dopo
+                                tr.dataset.pendingCliente = clientVal;
+                                tr.dataset.pendingViaggio = destVal;
+                                tr.dataset.pendingTarga = ass.targa || '';
+
+                                // Prova a impostarli subito
+                                tr.querySelector('.in-cliente').value = clientVal;
+                                window.aggiornaDestinazioni(tr, ass.dipendenteId, true);
+                                tr.querySelector('.in-viaggio').value = destVal;
+                                tr.querySelector('.in-targa').value = ass.targa || '';
+                                tr.querySelector('.in-confermato').checked = ass.confermato || false;
+                                window.toggleLockRow(tr);
+                            }
+                        });
+                        
+                        // Riordina il DOM basandosi sull'array assegnazioni salvato
+                        const tbody = document.getElementById('planningTbody');
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        const orderMap = new Map();
+                        data.assegnazioni.forEach((ass, idx) => {
+                            orderMap.set(ass.dipendenteId, idx);
+                        });
+
+                        rows.sort((a, b) => {
+                            const idA = a.getAttribute('data-id');
+                            const idB = b.getAttribute('data-id');
+                            const hasA = orderMap.has(idA);
+                            const hasB = orderMap.has(idB);
+
+                            if (hasA && hasB) {
+                                return orderMap.get(idA) - orderMap.get(idB);
+                            }
+                            // Chi non era salvato va in fondo
+                            if (!hasA && hasB) return 1;
+                            if (hasA && !hasB) return -1;
+
+                            // Ordine alfabetico autisti come fallback per quelli non salvati
+                            const nomeA = a.querySelector('.driver-name').innerText.trim().toUpperCase();
+                            const nomeB = b.querySelector('.driver-name').innerText.trim().toUpperCase();
+                            if (nomeA < nomeB) return -1;
+                            if (nomeA > nomeB) return 1;
+                            return 0;
+                        });
+
+                        rows.forEach(r => tbody.appendChild(r));
+                        
+                        if (typeof window.aggiornaDisponibilitaGlobale === 'function') {
+                            window.aggiornaDisponibilitaGlobale();
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Errore caricamento pianificazione:", err);
+            }
+        }
+
+        function applicaStatoBlocco(isBloccato) {
+            const isAdmin = (window.appData && window.appData.currentUser && (window.appData.currentUser.ruolo || '').toLowerCase() === 'amministratore');
+            const alertBlocco = document.getElementById('alertGiornataBloccata');
+            const btnBlocca = document.getElementById('btnBloccaGiornata');
+            const btnSalva = document.getElementById('btnSalva');
+            
+            // Gestione alert
+            if (alertBlocco) alertBlocco.style.display = isBloccato ? 'block' : 'none';
+            
+            // Gestione pulsante Salva e input tabella
+            if (isBloccato) {
+                btnSalva.disabled = true;
+                btnSalva.style.opacity = '0.5';
+                document.querySelectorAll('#planningTable select, #planningTable input').forEach(el => el.disabled = true);
+            } else {
+                btnSalva.disabled = false;
+                btnSalva.style.opacity = '1';
+                document.querySelectorAll('#planningTable select, #planningTable input').forEach(el => el.disabled = false);
+            }
+            
+            // Gestione visibilità pulsante Blocca (solo Admin)
+            if (isAdmin && btnBlocca) {
+                btnBlocca.style.display = 'flex'; // o block
+                if (isBloccato) {
+                    btnBlocca.innerHTML = '<span class="material-icons-round">lock_open</span>Sblocca Giornata';
+                    btnBlocca.style.backgroundColor = '#10b981'; // Verde per sbloccare
+                } else {
+                    btnBlocca.innerHTML = '<span class="material-icons-round">lock</span>Blocca Giornata';
+                    btnBlocca.style.backgroundColor = '#ef4444'; // Rosso per bloccare
+                }
+            } else if (btnBlocca) {
+                btnBlocca.style.display = 'none';
+            }
+        }
+
+        // Listener Pulsante Blocca Giornata
+        document.getElementById('btnBloccaGiornata').addEventListener('click', async () => {
+            const dataIso = dataInput.value;
+            if (!dataIso) return Swal.fire('Attenzione', 'Seleziona una data per la pianificazione.', 'warning');
+            
+            const btnBlocca = document.getElementById('btnBloccaGiornata');
+            btnBlocca.disabled = true;
+            
+            const newState = !window.currentGiornataBloccata;
+            try {
+                await bloccaGiornataPianificazione("DNR", dataIso, newState);
+                window.currentGiornataBloccata = newState;
+                applicaStatoBlocco(newState);
+                Swal.fire('Fatto!', newState ? 'Giornata bloccata con successo.' : 'Giornata sbloccata con successo.', 'success');
+            } catch (err) {
+                console.error("Errore aggiornamento blocco:", err);
+                Swal.fire('Errore', 'Impossibile modificare il blocco: ' + err.message, 'error');
+            } finally {
+                btnBlocca.disabled = false;
+            }
+        });
+
+        dataInput.addEventListener('change', async () => {
+            if (dataInput.value) {
+                // Reset blocco per default
+                window.currentGiornataBloccata = false;
+                applicaStatoBlocco(false);
+                
+                // Ricalcola le affinità per il nuovo giorno della settimana
+                ricalcolaAffinità(dataInput.value);
+                // Aggiorna le datalist (opzionale ma utile)
+                generaDatalists();
+                // Ricostruisci l'intera tabella coi nuovi badge
+                costruisciTabella();
+                // Infine popola la UI con i dati del database per quel giorno
+                await caricaPianificazione(dataInput.value);
+            }
+        });
+
+        // 3. Salvataggio
+        btnSalva.addEventListener('click', async () => {
+            if (window.currentGiornataBloccata) {
+                return Swal.fire('Attenzione', 'Questa giornata è bloccata.', 'error');
+            }
+            const dataIso = dataInput.value;
+            if (!dataIso) return Swal.fire('Attenzione', 'Seleziona una data per la pianificazione.', 'warning');
+
+            btnSalva.disabled = true;
+            btnSalva.innerHTML = '<span class="material-icons-round" style="animation: spin 1s linear infinite;">autorenew</span> Salvataggio...';
+
+            try {
+                const assegnazioni = [];
+                document.querySelectorAll('#planningTable tbody tr').forEach(tr => {
+                    const id = tr.getAttribute('data-id');
+                    const nome = tr.querySelector('.driver-name').innerText;
+                    const cliente = tr.querySelector('.in-cliente').value.trim();
+                    const viaggio = tr.querySelector('.in-viaggio').value.trim();
+                    const targa = tr.querySelector('.in-targa').value.trim();
+                    const confermato = tr.querySelector('.in-confermato').checked;
+
+                    assegnazioni.push({
+                        dipendenteId: id,
+                        nome: nome,
+                        cliente: cliente,
+                        viaggio: viaggio,
+                        targa: targa,
+                        confermato: confermato
+                    });
+                });
+
+                await salvaPianificazione("DNR", dataIso, assegnazioni);
+
+                Swal.fire({
+                    title: 'Salvato!',
+                    text: 'Pianificazione salvata con successo.',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+
+            } catch (err) {
+                console.error("Errore salvataggio:", err);
+                Swal.fire('Errore', 'Impossibile salvare la pianificazione: ' + err.message, 'error');
+            } finally {
+                btnSalva.disabled = false;
+                btnSalva.innerHTML = '<span class="material-icons-round">save</span> Salva Pianificazione';
+            }
+        });
+
+        // Avvio
+        window.esportaInPresenze = async function() {
+            const dataIso = document.getElementById('dataPianificazione').value;
+            if (!dataIso) return Swal.fire('Attenzione', 'Seleziona una data per la pianificazione.', 'warning');
+
+            const confirm = await Swal.fire({
+                title: 'Esporta in Presenze',
+                text: 'Attenzione: i dati presenti nella pianificazione viaggi sovrascriveranno qualsiasi dato presente in Presenze Dipendenti per questa giornata. Solo per i dipendenti valorizzati in questa pianificazione. Procedere?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sì, Esporta',
+                cancelButtonText: 'Annulla'
+            });
+
+            if (!confirm.isConfirmed) return;
+
+            const btnEsporta = document.getElementById('btnEsporta');
+            const originalHTML = btnEsporta.innerHTML;
+            btnEsporta.disabled = true;
+            btnEsporta.innerHTML = '<span class="material-icons-round" style="animation: spin 1s linear infinite;">autorenew</span> Esportazione...';
+
+            try {
+                // Raccogliamo solo i dipendenti che hanno qualcosa assegnato (cliente, viaggio, o targa)
+                const assegnazioniDaEsportare = [];
+                document.querySelectorAll('#planningTable tbody tr').forEach(tr => {
+                    const id = tr.getAttribute('data-id');
+                    if (!id) return;
+                    
+                    const cliente = tr.querySelector('.in-cliente').value.trim();
+                    const viaggio = tr.querySelector('.in-viaggio').value.trim();
+                    const targa = tr.querySelector('.in-targa').value.trim();
+                    const autistaNome = tr.querySelector('.driver-name').textContent.trim();
+
+                    if (cliente || viaggio || targa) {
+                        assegnazioniDaEsportare.push({
+                            dipendenteId: id,
+                            autistaNome: autistaNome,
+                            cliente: cliente,
+                            viaggio: viaggio,
+                            targa: targa
+                        });
+                    }
+                });
+
+                if (assegnazioniDaEsportare.length === 0) {
+                    Swal.fire('Attenzione', 'Nessun dipendente assegnato in questa pianificazione.', 'info');
+                    return;
+                }
+
+                const { doc, writeBatch } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const batch = writeBatch(window.db);
+                
+                const mese = dataIso.substring(0, 7); // formato YYYY-MM, allineato a presenze.html
+                const dt = new Date(dataIso);
+                const giorniSettimana = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+                const giornoSettimana = giorniSettimana[dt.getDay()];
+                const timestamp = new Date().toISOString();
+
+                assegnazioniDaEsportare.forEach(ass => {
+                    // Formato ID presenze: dipendenteId_dataIso
+                    const presenzaRef = doc(window.db, 'presenze', `${ass.dipendenteId}_${dataIso}`);
+                    batch.set(presenzaRef, {
+                        cliente: ass.cliente,
+                        viaggio: ass.viaggio,
+                        targa: ass.targa,
+                        data: dataIso,
+                        mese: mese,
+                        giornoSettimana: giornoSettimana,
+                        autistaId: ass.dipendenteId,
+                        autistaNome: ass.autistaNome,
+                        dipendenteId: ass.dipendenteId, // Mantenuto per compatibilità
+                        timestamp: timestamp
+                    }, { merge: true });
+                });
+
+                await batch.commit();
+
+                Swal.fire({
+                    title: 'Esportato!',
+                    text: `Sono stati aggiornati/sovrascritti i dati di ${assegnazioniDaEsportare.length} dipendenti in Presenze.`,
+                    icon: 'success',
+                    timer: 3000,
+                    showConfirmButton: false
+                });
+
+            } catch (err) {
+                console.error("Errore esportazione:", err);
+                Swal.fire('Errore', 'Impossibile esportare in presenze: ' + err.message, 'error');
+            } finally {
+                btnEsporta.disabled = false;
+                btnEsporta.innerHTML = originalHTML;
+            }
+        };
+
+        // Eventi Iniziali
+        document.addEventListener("DOMContentLoaded", () => {
+            // Event Delegation per evitare eventi inline e migliorare le prestazioni
+            document.getElementById('planningTable').addEventListener('change', (e) => {
+                const tr = e.target.closest('tr');
+                if (!tr || tr.id === 'no-data-row') return;
+                
+                if (e.target.classList.contains('in-cliente')) {
+                    window.aggiornaDestinazioni(tr, tr.dataset.id);
+                } else if (e.target.classList.contains('in-viaggio') || e.target.classList.contains('in-targa')) {
+                    if (typeof window.aggiornaDisponibilitaGlobale === 'function') window.aggiornaDisponibilitaGlobale();
+                } else if (e.target.classList.contains('in-confermato')) {
+                    if (typeof window.toggleLockRow === 'function') window.toggleLockRow(tr);
+                }
+            });
+
+            inizializza();
+        });
+
+    </script>
+    <script type="module" src="firebase-auth-sync.js?v=6.408"></script>
+    <script src="script.js?v=6.408"></script>
+</body>
+</html>
+

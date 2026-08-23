@@ -1,5 +1,0 @@
-2026/07/24-16:38:44.105 1284 Creating DB G:\Il mio Drive\App\AppLogSolutionsWeb\e2e-tests\.playwright_auth_profile\Default\IndexedDB\https_log-solutions-sviluppo.web.app_0.indexeddb.leveldb since it was missing.
-2026/07/24-16:38:44.804 1284 Reusing MANIFEST G:\Il mio Drive\App\AppLogSolutionsWeb\e2e-tests\.playwright_auth_profile\Default\IndexedDB\https_log-solutions-sviluppo.web.app_0.indexeddb.leveldb/MANIFEST-000001
-2026/07/24-16:38:45.070 1284 Manual compaction at level-0 from '\x00\x01\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x02\x00\x00\x00' @ 0 : 0; will stop at (end)
-2026/07/24-16:38:48.697 214c Manual compaction at level-0 from '\x00\x05\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x06\x00\x00\x00' @ 0 : 0; will stop at (end)
-2026/07/24-16:38:51.143 1284 Manual compaction at level-0 from '\x00\x06\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x07\x00\x00\x00' @ 0 : 0; will stop at (end)

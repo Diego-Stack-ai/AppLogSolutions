@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elaborazione Distinte - Log Solution</title>
+    <link rel="stylesheet" href="styles.css?v=6.408">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <meta name="theme-color" content="#4f46e5">
+    <style>
+        .upload-section {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-top: 20px;
+            margin-bottom: 30px;
+        }
+
+        .drop-zone {
+            background: rgba(255, 255, 255, 0.5);
+            border: 2px dashed var(--primary);
+            border-radius: 16px;
+            padding: 24px 16px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @media (max-width: 900px) {
+            .upload-section {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 480px) {
+            .upload-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            background: rgba(79, 70, 229, 0.1);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px -10px var(--primary-glow);
+        }
+
+        .drop-zone .material-icons-round {
+            font-size: 48px;
+            color: var(--primary);
+            margin-bottom: 12px;
+        }
+
+        .drop-zone.latte-zone {
+            border-color: #0ea5e9;
+        }
+        .drop-zone.latte-zone .material-icons-round {
+            color: #0ea5e9;
+        }
+        .drop-zone.latte-zone:hover {
+            background: rgba(14, 165, 233, 0.1);
+            box-shadow: 0 10px 20px -10px rgba(14, 165, 233, 0.4);
+        }
+
+        .drop-zone.chef-zone {
+            border-color: #f59e0b;
+        }
+        .drop-zone.chef-zone .material-icons-round {
+            color: #f59e0b;
+        }
+        .drop-zone.chef-zone:hover {
+            background: rgba(245, 158, 11, 0.1);
+            box-shadow: 0 10px 20px -10px rgba(245, 158, 11, 0.4);
+        }
+
+        .drop-zone.cattel-zone {
+            border-color: #10b981;
+            background-color: #ecfdf5;
+        }
+        .drop-zone.cattel-zone .material-icons-round {
+            color: #10b981;
+        }
+        .drop-zone.cattel-zone:hover {
+            border-color: #059669;
+            background-color: #d1fae5;
+        }
+
+        /* Nuova Zona DAC */
+        .drop-zone.dac-zone {
+            border-color: #8b5cf6;
+            background-color: #f5f3ff;
+        }
+        .drop-zone.dac-zone .material-icons-round {
+            color: #8b5cf6;
+        }
+        .drop-zone.dac-zone:hover {
+            border-color: #7c3aed;
+            background-color: #ede9fe;
+        }
+
+        .drop-zone h3 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            color: var(--text-main);
+        }
+
+        .drop-zone p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .file-input {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 1;
+        }
+
+        .files-container {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            text-align: left;
+            max-height: 180px;
+            overflow-y: auto;
+            padding-right: 4px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .file-badge {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #1e293b;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+            transition: all 0.2s ease;
+            position: relative;
+            z-index: 3;
+        }
+        
+        .file-badge:hover {
+            border-color: var(--primary);
+            transform: translateX(2px);
+        }
+        
+        .file-badge .file-name-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .file-badge .btn-remove-file {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            padding: 2px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        
+        .file-badge .btn-remove-file:hover {
+            background: #fee2e2;
+        }
+
+        .btn-elabora {
+            background: linear-gradient(135deg, var(--primary), #3730a3);
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            padding: 20px;
+            border-radius: 16px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 10px 30px -10px var(--primary-glow);
+            transition: all 0.3s ease;
+        }
+
+        .btn-elabora:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px -10px var(--primary-glow);
+        }
+
+        .btn-elabora:disabled {
+            background: #cbd5e1;
+            box-shadow: none;
+            transform: none;
+            cursor: not-allowed;
+            color: #64748b;
+        }
+        
+        .progress-container {
+            margin-top: 24px;
+            display: none;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--success);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+
+    
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="glass-nav">
+        <div class="nav-content">
+            <img src="img/logo.png" alt="LS" style="height: 32px; width: auto; margin-right: 8px;">
+            <button id="dashboardBtn" class="logout-btn" title="Dashboard"
+                onclick="window.navigateWithState('dashboard.html')"
+                style="border:none; background:none; cursor:pointer; margin-right:8px; display:flex;">
+                <span class="material-icons-round">dashboard</span>
+            </button>
+            <div class="nav-title" style="flex: 1;">Workflow Logistico</div>
+            <a href="#" onclick="window.logoutFirebase(); return false;" class="logout-btn" title="Esci"><span class="material-icons-round">logout</span></a>
+        </div>
+    </nav>
+
+    <div class="main-container" style="padding-top: 0px; margin-top: 16px;">
+        <h1 style="display:none;">
+            Elaborazione Distinte
+        </h1>
+        <div class="glass-panel" style="margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(255, 255, 255, 0.8));">
+            <div style="margin-bottom: 16px;">
+                <h3 style="margin:0; color: var(--primary); font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">Data di Lavoro Referenziale</h3>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <input type="date" id="master-date-selector" style="flex: 1; padding: 10px 16px; border-radius: 12px; border: 2px solid var(--primary); font-family:'Outfit'; font-size: 16px; font-weight: 800; color: var(--primary); outline: none; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);">
+                    <button id="lock-date-btn" class="glass-btn" style="padding: 8px; border-radius: 10px; color: var(--primary); border: 2px solid var(--primary);" title="Blocca/Sblocca Data">
+                        <span class="material-icons-round" id="lock-icon">lock_open</span>
+                    </button>
+                </div>
+            <div style="display: flex; gap: 12px; width: 100%;">
+                <button class="glass-btn" onclick="window.navigateWithState('gestione_anomalie.html')" style="flex: 1; justify-content: center; padding: 10px; border-radius: 12px; font-weight: 700; color: #ef4444; border: 2px solid #ef4444; background: white; display: flex; align-items: center; gap: 8px;" title="Risolvi clienti, articoli e orari non riconosciuti">
+                    <span class="material-icons-round">fact_check</span> ANOMALIE
+                </button>
+                <button class="glass-btn" id="btn-gestione-mappa-data" style="flex: 1; justify-content: center; padding: 10px; border-radius: 12px; font-weight: 700; color: white; border: none; background: linear-gradient(135deg, var(--primary), #3730a3); display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);" title="Apri la mappa interattiva per la data selezionata">
+                    <span class="material-icons-round">edit_location</span> MAPPA
+                </button>
+                <button class="glass-btn" id="btn-elimina-giornata-data" style="flex: 1; justify-content: center; padding: 10px; border-radius: 12px; font-weight: 700; color: white; border: none; background: linear-gradient(135deg, #ef4444, #991b1b); display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);" title="Elimina completamente tutti i dati della data selezionata">
+                    <span class="material-icons-round">delete_forever</span> ELIMINA
+                </button>
+            </div>
+        </div>
+
+
+        <div class="glass-panel form-card">
+            <h2 style="margin-bottom: 24px;">Carica dati da elaborare</h2>
+
+            <div class="upload-section">
+                <!-- Zona FRUTTA -->
+                <div class="drop-zone" id="zone-frutta">
+                    <span class="material-icons-round">apple</span>
+                    <h3>PDF Frutta</h3>
+                    <p>Trascina qui il PDF o clicca per sfogliare</p>
+                    <input type="file" id="file-frutta" class="file-input" accept="application/pdf" multiple>
+                    <div class="files-container" id="container-frutta"></div>
+                </div>
+
+                <!-- Zona LATTE -->
+                <div class="drop-zone latte-zone" id="zone-latte">
+                    <span class="material-icons-round">water_drop</span>
+                    <h3>PDF Latte</h3>
+                    <p>Trascina qui il PDF o clicca per sfogliare</p>
+                    <input type="file" id="file-latte" class="file-input" accept="application/pdf" multiple>
+                    <div class="files-container" id="container-latte"></div>
+                </div>
+
+                <!-- Zona GRAND CHEF -->
+                <div class="drop-zone chef-zone" id="zone-chef">
+                    <span class="material-icons-round">restaurant</span>
+                    <h3>Excel Gran Chef</h3>
+                    <p>Trascina qui l'Excel o clicca per sfogliare</p>
+                    <input type="file" id="file-chef" class="file-input" accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, .xlsx" multiple>
+                    <div class="files-container" id="container-chef"></div>
+                </div>
+
+                <!-- Zona CATTEL -->
+                <div class="drop-zone cattel-zone" id="zone-cattel" style="position: relative;">
+                    <span class="material-icons-round">local_shipping</span>
+                    <h3>Excel Cattel</h3>
+                    <p>Trascina qui l'Excel o clicca per sfogliare</p>
+                    <input type="file" id="file-cattel" class="file-input" accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, .xlsx" multiple>
+                    <div class="files-container" id="container-cattel"></div>
+                    <button type="button" class="glass-btn" id="btn-credenziali-cattel" style="margin-top: 10px; padding: 6px 12px; font-size: 12px; border-radius: 8px; color: #10b981; border: 1.5px solid #10b981; position: relative; z-index: 10; font-weight: 700; width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px; background: white;">
+                        <span class="material-icons-round" style="font-size: 16px !important; margin: 0 !important; color: #10b981 !important; margin-bottom: 0px !important; vertical-align: middle;">vpn_key</span> CREDENZIALI PORTALE
+                    </button>
+                </div>
+
+                <!-- Zona DAC -->
+                <div class="drop-zone dac-zone" id="zone-dac">
+                    <span class="material-icons-round">apartment</span>
+                    <h3>Excel DAC</h3>
+                    <p>Trascina qui l'Excel o clicca per sfogliare</p>
+                    <input type="file" id="file-dac" class="file-input" accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, .xlsx" multiple>
+                    <div class="files-container" id="container-dac"></div>
+                </div>
+            </div>
+
+            <!-- Bottone Avvio -->
+            <button class="btn-elabora" id="btn-avvia" disabled>
+                <span class="material-icons-round">cloud_upload</span>
+                Carica file
+            </button>
+            
+            <div class="progress-container" id="progress-area">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #475569;">
+                    <span id="progress-status-text">Caricamento su Storage in corso...</span>
+                    <span id="progress-percentage">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+
+            <!-- Area Jobs (Nascosto all'inizio) -->
+            <div id="jobs-area" style="display: none; margin-top: 32px; padding-top: 24px; border-top: 2px dashed #e2e8f0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3 style="color: var(--primary); margin:0; display: flex; align-items: center; gap: 8px;">
+                        <span class="material-icons-round">sync</span> Stato Elaborazione (Realtime)
+                    </h3>
+                    <button onclick="window.svuotaTuttoJobs()" id="btnClearAll" style="background:#fee2e2; color:#ef4444; border:none; padding:8px 12px; border-radius:12px; font-weight:700; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:4px;">
+                        <span class="material-icons-round" style="font-size:18px;">delete_sweep</span> SVUOTA TUTTO
+                    </button>
+                </div>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">
+                    I job vengono elaborati asincronamente. Puoi eliminare singole voci o svuotare l'intera cronologia.
+                </p>
+
+                <div id="jobs-list" style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- I job appariranno qui -->
+                </div>
+            </div>
+
+            <!-- Area Report e Mappe (Step 2-4) -->
+            <div id="reports-area" style="display: none; margin-top: 32px; padding-top: 24px; border-top: 2px solid #e2e8f0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3 style="color: #10b981; margin:0; display: flex; align-items: center; gap: 8px;">
+                        <span class="material-icons-round">map</span> Report e Mappe Generali
+                    </h3>
+                </div>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">
+                    Dopo aver elaborato i PDF, genera la mappa generale delle zone e la lista unificata dei punti di consegna.
+                </p>
+                
+                <div style="margin-bottom: 20px;">
+                    <button id="btn-genera-report" onclick="window.generaReport()" class="btn-elabora" style="background: #10b981; padding: 12px; font-size: 15px;">
+                        <span class="material-icons-round">auto_awesome</span> GENERA MAPPA ZONE E LISTA PUNTI
+                    </button>
+                </div>
+
+                <div id="reports-list" style="display: flex; flex-direction: column; gap: 12px;">
+                    <!-- I report appariranno qui -->
+                </div>
+            </div>
+            
+        </div>
+    </main>
+
+    <script src="script.js?v=6.408"></script>
+    <script type="module" src="firebase-auth-sync.js?v=6.408"></script>
+    <script type="module">
+        import { db, app } from "./core/firebase-init.js";
+        import { getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, limit, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
+        import { firebaseConfig } from "./firebase-config.js"; 
+        import { subscribeToReportsLogistici, subscribeToProcessingJobs } from "./services/viaggiService.js";
+
+
+
+
+
+        const storage = getStorage(app);
+        const functions = getFunctions(app, "europe-west1");
+
+        let filesFrutta = [];
+        let filesLatte = [];
+        let filesChef = [];
+        let filesCattel = [];
+        let filesDac = [];
+
+        function setupMultiFileSelect(inputId, zoneId, containerId, filesArray, typeName) {
+            const input = document.getElementById(inputId);
+            const zone = document.getElementById(zoneId);
+            const container = document.getElementById(containerId);
+
+            const renderFilesList = () => {
+                container.innerHTML = '';
+                if (filesArray.length > 0) {
+                    zone.style.background = 'rgba(16, 185, 129, 0.03)';
+                    zone.style.borderColor = 'var(--success)';
+                    
+                    filesArray.forEach((file, index) => {
+                        const badge = document.createElement('div');
+                        badge.className = 'file-badge';
+                        badge.innerHTML = `
+                            <div class="file-name-wrapper">
+                                <span class="material-icons-round" style="font-size:16px; color:#64748b;">insert_drive_file</span>
+                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">${file.name}</span>
+                            </div>
+                            <button class="btn-remove-file" title="Rimuovi">
+                                <span class="material-icons-round" style="font-size:16px;">close</span>
+                            </button>
+                        `;
+                        badge.querySelector('.btn-remove-file').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            filesArray.splice(index, 1);
+                            renderFilesList();
+                            checkReadyState();
+                        });
+                        container.appendChild(badge);
+                    });
+                } else {
+                    zone.style.background = 'rgba(255, 255, 255, 0.5)';
+                    zone.style.borderColor = '';
+                }
+            };
+
+            // Listener per il click esplicito sulla zona (risolve problemi di z-index o browser block)
+            zone.addEventListener('click', (e) => {
+                // Non attivare l'input se clicchiamo su bottoni o badge all'interno della zona
+                if (e.target.closest('button') || e.target.closest('.file-badge') || e.target === input) return;
+                input.click();
+            });
+
+            // Gestione Drag & Drop esplicita
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+            zone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+            });
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+                    Array.from(e.dataTransfer.files).forEach(file => {
+                        if (!filesArray.some(f => f.name === file.name)) {
+                            filesArray.push(file);
+                        }
+                    });
+                    renderFilesList();
+                    checkReadyState();
+                }
+            });
+
+            input.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    Array.from(e.target.files).forEach(file => {
+                        if (!filesArray.some(f => f.name === file.name)) {
+                            filesArray.push(file);
+                        }
+                    });
+                    input.value = ''; // Consente di riselezionare lo stesso file se cancellato
+                    renderFilesList();
+                    checkReadyState();
+                }
+            });
+        }
+
+        function checkReadyState() {
+            const btn = document.getElementById('btn-avvia');
+            const total = filesFrutta.length + filesLatte.length + filesChef.length + filesCattel.length + filesDac.length;
+            if (total > 0) {
+                btn.disabled = false;
+                btn.innerHTML = `<span class="material-icons-round">cloud_upload</span> Carica ${total} file`;
+            } else {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="material-icons-round">cloud_upload</span> Carica file`;
+            }
+        }
+
+        setupMultiFileSelect('file-frutta', 'zone-frutta', 'container-frutta', filesFrutta, 'Frutta');
+        setupMultiFileSelect('file-latte', 'zone-latte', 'container-latte', filesLatte, 'Latte');
+        setupMultiFileSelect('file-chef', 'zone-chef', 'container-chef', filesChef, 'GRAND_CHEF');
+        setupMultiFileSelect('file-cattel', 'zone-cattel', 'container-cattel', filesCattel, 'CATTEL');
+        setupMultiFileSelect('file-dac', 'zone-dac', 'container-dac', filesDac, 'DAC');
+
+        document.getElementById('btn-credenziali-cattel').addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.mostraPopupCattel();
+        });
+
+        window.mostraPopupCattel = async () => {
+            let username = "cattel.somma";
+            let password = "HuhN28ci";
+            let loginUrl = "https://intime.lac-consulting.eu/webClient/login.xhtml";
+            
+            try {
+                const { getDocs, collection, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const q = query(collection(db, "clienti_fatturazione"), where("nome", "==", "CATTEL"));
+                const snap = await window.getDocsConFallback(q);
+                if (!snap.empty) {
+                    const d = snap.docs[0].data();
+                    if (d.cattel_username) username = d.cattel_username;
+                    if (d.cattel_password) password = d.cattel_password;
+                    if (d.cattel_url) loginUrl = d.cattel_url;
+                }
+            } catch (err) {
+                console.warn("Impossibile caricare credenziali da progetti Firestore:", err);
+            }
+
+            Swal.fire({
+                title: 'Credenziali Portale CATTEL',
+                html: `
+                    <div style="text-align: left; background: #f8f9fa; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; font-family: 'Outfit', sans-serif;">
+                        <div style="margin-bottom: 12px;">
+                            <label style="font-weight: 700; font-size: 13px; color: #475569; display: block; margin-bottom: 4px;">USERNAME</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input id="swal-username" type="text" class="swal2-input" value="${username}" readonly style="margin: 0; flex: 1; height: 38px; font-size: 14px; font-family: monospace; background-color: #e2e8f0; cursor: not-allowed;">
+                                <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('swal-username').value); Swal.showValidationMessage('Username copiato!'); setTimeout(()=>Swal.resetValidationMessage(), 1500);" style="background: #10b981; color: white; border: none; padding: 0 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center;"><span class="material-icons-round" style="font-size: 18px; color: white !important;">content_copy</span></button>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 16px;">
+                            <label style="font-weight: 700; font-size: 13px; color: #475569; display: block; margin-bottom: 4px;">PASSWORD</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input id="swal-password" type="text" class="swal2-input" value="${password}" readonly style="margin: 0; flex: 1; height: 38px; font-size: 14px; font-family: monospace; background-color: #e2e8f0; cursor: not-allowed;">
+                                <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('swal-password').value); Swal.showValidationMessage('Password copiata!'); setTimeout(()=>Swal.resetValidationMessage(), 1500);" style="background: #10b981; color: white; border: none; padding: 0 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center;"><span class="material-icons-round" style="font-size: 18px; color: white !important;">content_copy</span></button>
+                            </div>
+                        </div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 8px; line-height: 1.4;">
+                            💡 Per modificare queste credenziali, vai in <a href="javascript:void(0)" onclick="Swal.close(); window.navigateWithState('fatturazione_clienti.html')" style="color: #4f46e5; text-decoration: underline; font-weight: 700;">Fatturazione Clienti</a> ed edita il profilo di <b>CATTEL</b>.
+                        </div>
+                    </div>
+                `,
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonText: '<span class="material-icons-round" style="vertical-align: middle; font-size:18px; margin-right:4px; color: white !important;">open_in_new</span> Vai al Portale',
+                cancelButtonText: 'Chiudi',
+                confirmButtonColor: '#0ea5e9',
+                cancelButtonColor: '#64748b'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.open(loginUrl, '_blank');
+                }
+            });
+        };
+
+        function getTenantDbPath(typeName) {
+            const t = typeName.toUpperCase();
+            if (t === "GRAND_CHEF" || t === "GRAND CHEF" || t === "GRAN CHEF") {
+                return ['clienti', 'GRAN CHEF'];
+            }
+            if (t === "CATTEL") {
+                return ['clienti', 'CATTEL'];
+            }
+            if (t === "DAC") {
+                return ['clienti', 'DAC'];
+            }
+            return ['clienti', 'DNR'];
+        }
+
+        async function uploadFileToStorage(file, typeName) {
+            if (!file) return null;
+            const dateInput = document.getElementById('master-date-selector').value;
+            const dateStr = dateInput.split('-').reverse().join('-');
+            const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+            const isExcel = file.name.endsWith('.xlsx');
+            const path = `input_pdf_fornitore/${typeName}_${dateStr}_${safeName}`;
+            const storageRef = ref(storage, path);
+            
+            const fillDiv = document.getElementById('progress-fill');
+            const percText = document.getElementById('progress-percentage');
+            const statText = document.getElementById('progress-status-text');
+
+            return new Promise((resolve, reject) => {
+                const uploadTask = uploadBytesResumable(storageRef, file);
+
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        fillDiv.style.width = progress + '%';
+                        percText.textContent = Math.round(progress) + '%';
+                        statText.textContent = `Sto inviando il file ${typeName}...`;
+                    }, 
+                    (error) => reject(error), 
+                    async () => {
+                        try {
+                            const tenantPath = getTenantDbPath(typeName);
+                            const jobsRef = collection(db, ...tenantPath, 'processing_jobs');
+                            
+                            let competenzaVal = typeName.toUpperCase();
+                            const tnUpper = typeName.toUpperCase();
+                            if (tnUpper === "FRUTTA") {
+                                competenzaVal = "DNR_FRUTTA";
+                            } else if (tnUpper === "LATTE") {
+                                competenzaVal = "DNR_LATTE";
+                            } else if (tnUpper === "GRAND_CHEF" || tnUpper === "GRAND CHEF" || tnUpper === "GRAN CHEF") {
+                                competenzaVal = "GRAN_CHEF";
+                            } else if (tnUpper === "CATTEL") {
+                                competenzaVal = "CATTEL";
+                            } else if (tnUpper === "DAC") {
+                                competenzaVal = "DAC";
+                            }
+                            
+                            const jobDoc = await addDoc(jobsRef, {
+                                status: "uploaded",
+                                type: typeName.toUpperCase(),
+                                competenza: competenzaVal,
+                                data_lavoro: dateStr, // Forziamo la data scelta nel calendario
+                                storage_path: path,
+                                is_excel: isExcel,
+                                created_at: serverTimestamp(),
+                                updated_at: serverTimestamp()
+                            });
+                            
+                            // Avvio immediato della funzione cloud
+                            const processaJob = httpsCallable(functions, 'processa_job_pdf', { timeout: 540000 });
+                            processaJob({ job_id: jobDoc.id, tenant: tenantPath[1] }).catch(e => {
+                                console.error("Errore trigger:", e);
+                                alert("Errore durante l'elaborazione: " + e.message);
+                            });
+                            
+                            resolve({path, jobId: jobDoc.id});
+                        } catch (e) {
+                            reject(e);
+                        }
+                    }
+                );
+            });
+        }
+
+        window.eliminaJob = async (jobId, storagePath, tenant = 'DNR', skipConfirm = false) => {
+            if(!skipConfirm && !confirm("Sei sicuro di voler eliminare questo Job? Verranno rimossi anche i DDT associati.")) return;
+            
+            try {
+                const { doc, deleteDoc, collection, query, where, getDocs, writeBatch } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                const { getStorage, ref, deleteObject } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js");
+                
+                // 1. Elimina file da Storage
+                if(storagePath) {
+                    const fileRef = ref(storage, storagePath);
+                    await deleteObject(fileRef).catch(e => console.warn("File non trovato:", storagePath));
+                }
+
+                // 2. Rimuovi i DDT associati
+                const ddtRef = collection(db, 'customers', tenant, 'deliveries');
+                const q = query(ddtRef, where('job_id', '==', jobId));
+                const ddtSnap = await window.getDocsConFallback(q);
+                
+                if(!ddtSnap.empty) {
+                    const batch = writeBatch(db);
+                    ddtSnap.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                }
+
+                // 3. Elimina il Job document
+                await deleteDoc(doc(db, 'clienti', tenant, 'processing_jobs', jobId));
+                if(!skipConfirm) console.log(`[Job] ${jobId} rimosso.`);
+            } catch (err) {
+                console.error("Errore eliminazione:", err);
+            }
+        };
+
+        window.svuotaTuttoJobs = async () => {
+            if(!confirm("⚠️ ATTENZIONE: Questa azione eliminerà TUTTI i Job visibili e tutti i DDT associati. Procedere?")) return;
+            
+            const btn = document.getElementById('btnClearAll');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-icons-round">hourglass_top</span> ELIMINAZIONE...';
+            
+            const { getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            
+            const promises = [];
+            
+            // Svuota DNR
+            const snapDNR = await window.getDocsConFallback(collection(db, 'clienti', 'DNR', 'processing_jobs'));
+            snapDNR.forEach(doc => {
+                promises.push(window.eliminaJob(doc.id, doc.data().storage_path, 'DNR', true));
+            });
+
+            // Svuota GRAN CHEF
+            const snapGC = await window.getDocsConFallback(collection(db, 'clienti', 'GRAN CHEF', 'processing_jobs'));
+            snapGC.forEach(doc => {
+                promises.push(window.eliminaJob(doc.id, doc.data().storage_path, 'GRAN CHEF', true));
+            });
+
+            // Svuota CATTEL
+            const snapCattel = await window.getDocsConFallback(collection(db, 'clienti', 'CATTEL', 'processing_jobs'));
+            snapCattel.forEach(doc => {
+                promises.push(window.eliminaJob(doc.id, doc.data().storage_path, 'CATTEL', true));
+            });
+            
+            // Svuota DAC
+            const snapDac = await window.getDocsConFallback(collection(db, 'clienti', 'DAC', 'processing_jobs'));
+            snapDac.forEach(doc => {
+                promises.push(window.eliminaJob(doc.id, doc.data().storage_path, 'DAC', true));
+            });
+            
+            await Promise.all(promises);
+            alert("Database e cronologia puliti con successo.");
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-icons-round">delete_sweep</span> SVUOTA TUTTO';
+        };
+
+        let activeJobsDNR = [];
+        let activeJobsGC = [];
+        let activeJobsCattel = [];
+        let activeJobsDac = [];
+        let initialLoad = true;
+        let notifiedJobs = new Set();
+        let loadedDNR = false;
+        let loadedGC = false;
+        let loadedCattel = false;
+        let loadedDac = false;
+
+        function renderMergedJobs() {
+            const jobsList = document.getElementById('jobs-list');
+            const merged = [];
+            activeJobsDNR.forEach(j => merged.push({ ...j, tenant: 'DNR' }));
+            activeJobsGC.forEach(j => merged.push({ ...j, tenant: 'GRAN CHEF' }));
+            activeJobsCattel.forEach(j => merged.push({ ...j, tenant: 'CATTEL' }));
+            activeJobsDac.forEach(j => merged.push({ ...j, tenant: 'DAC' }));
+            
+            merged.sort((a, b) => {
+                const ta = a.created_at?.toDate ? a.created_at.toDate().getTime() : 0;
+                const tb = b.created_at?.toDate ? b.created_at.toDate().getTime() : 0;
+                return tb - ta;
+            });
+
+            const sliced = merged.slice(0, 10);
+            let html = '';
+            let combinedMsg = '';
+            let hasNewAnomalies = false;
+
+            sliced.forEach(data => {
+                let icon = 'hourglass_empty';
+                let color = '#f59e0b';
+                if (data.status === 'completed') { icon = 'check_circle'; color = '#10b981'; }
+                if (data.status === 'error') { icon = 'error'; color = '#ef4444'; }
+                if (data.status === 'processing') { icon = 'autorenew'; color = '#3b82f6'; }
+
+                if (data.status === 'completed') {
+                    if (initialLoad) {
+                        notifiedJobs.add(data.id);
+                    } else if (!notifiedJobs.has(data.id)) {
+                        notifiedJobs.add(data.id);
+                        let n_c = data.nuovi_clienti || 0;
+                        let n_a = data.nuovi_articoli || 0;
+                        let n_o = data.nuovi_orari || 0;
+                        
+                        if (n_c > 0 || n_a > 0 || n_o > 0) {
+                            hasNewAnomalies = true;
+                            combinedMsg += `<div style='text-align:left; font-size:14px; margin-top:10px; padding:12px; background:#f8fafc; border-radius:8px; border: 1px solid #e2e8f0;'>`;
+                            combinedMsg += `<div style='color:#0f172a; font-size:15px; font-weight:800; text-transform:uppercase; margin-bottom:10px;'>📌 JOB ${data.type} <span style='font-size:10px; color:#94a3b8; font-weight:700;'>[${data.tenant || 'DNR'}]</span></div>`;
+                            
+                            if (n_c > 0) {
+                                let listC = data.nuovi_clienti_list ? data.nuovi_clienti_list.join(', ') : '';
+                                combinedMsg += `<div style='margin-bottom:8px; display:flex; align-items:flex-start; gap:8px;'>
+                                    <span style='background:#fee2e2; color:#ef4444; padding:3px 8px; border-radius:4px; font-weight:700; white-space:nowrap; font-size:11px;'>👥 ${n_c} Clienti</span>
+                                    <span style='font-size:12px; color:#475569; line-height:1.4;'>${listC}</span>
+                                </div>`;
+                            }
+                            if (n_a > 0) {
+                                let listA = data.nuovi_articoli_list ? data.nuovi_articoli_list.join(', ') : '';
+                                combinedMsg += `<div style='margin-bottom:8px; display:flex; align-items:flex-start; gap:8px;'>
+                                    <span style='background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:4px; font-weight:700; white-space:nowrap; font-size:11px;'>📦 ${n_a} Articoli</span>
+                                    <span style='font-size:12px; color:#475569; line-height:1.4;'>${listA}</span>
+                                </div>`;
+                            }
+                            if (n_o > 0) {
+                                let listO = data.nuovi_orari_list ? data.nuovi_orari_list.join(', ') : '';
+                                combinedMsg += `<div style='margin-bottom:0px; display:flex; align-items:flex-start; gap:8px;'>
+                                    <span style='background:#e0e7ff; color:#4f46e5; padding:3px 8px; border-radius:4px; font-weight:700; white-space:nowrap; font-size:11px;'>🕒 ${n_o} Orari</span>
+                                    <span style='font-size:12px; color:#475569; line-height:1.4;'>${listO}</span>
+                                </div>`;
+                            }
+                            combinedMsg += `</div>`;
+                        }
+                    }
+                }
+
+                html += `
+                    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 16px; transition: 0.2s;" id="job-${data.id}">
+                        <span class="material-icons-round" style="color: ${color}; font-size: 28px;">${icon}</span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 15px; display:flex; align-items:center; gap:8px;">
+                                Job ${data.type}
+                                <span style="font-size: 10px; background: ${data.tenant === 'GRAN CHEF' ? '#fef3c7' : (data.tenant === 'CATTEL' ? '#e0f2fe' : (data.tenant === 'DAC' ? '#f5f3ff' : '#e0e7ff'))}; color: ${data.tenant === 'GRAN CHEF' ? '#d97706' : (data.tenant === 'CATTEL' ? '#0369a1' : (data.tenant === 'DAC' ? '#8b5cf6' : '#4f46e5'))}; padding: 2px 6px; border-radius: 4px; font-weight: 700;">${data.tenant || 'DNR'}</span>
+                            </div>
+                            <div style="color: var(--text-muted); font-size: 13px;">Stato: <b style="color: ${color}; text-transform: uppercase;">${data.status}</b></div>
+                            ${data.error_message ? `<div style="color: #ef4444; font-size: 12px; margin-top: 6px; background: #fef2f2; border: 1px dashed #fca5a5; padding: 6px 10px; border-radius: 6px; font-family: monospace; white-space: pre-wrap; word-break: break-word;">❌ Errore: ${data.error_message}</div>` : ''}
+                            ${data.data_rilevata ? `<div style="font-size: 12px; color: #4f46e5; font-weight: 700; margin-top:2px;">📅 Data nel file: ${data.data_rilevata}</div>` : ''}
+                            <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+                                ${data.nuovi_clienti ? `<span style="background:#fee2e2; color:#ef4444; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">${data.nuovi_clienti} Clienti Ignoti</span>` : ''}
+                                ${data.nuovi_articoli ? `<span style="background:#fef3c7; color:#d97706; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">${data.nuovi_articoli} Articoli Ignoti</span>` : ''}
+                                ${data.nuovi_orari ? `<span style="background:#e0e7ff; color:#4f46e5; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">${data.nuovi_orari} Orari Rilevati</span>` : ''}
+                            </div>
+                            ${data.meta_path_json ? `<div style="font-size: 9px; color: #94a3b8; font-family: monospace; margin-top:4px;">📁 Path: ${data.meta_path_json}</div>` : ''}
+                            <div style="font-size: 10px; color: #94a3b8; margin-top:2px;">${data.created_at?.toDate ? new Date(data.created_at.toDate()).toLocaleString() : ''}</div>
+                        </div>
+
+                        <div style="display:flex; gap:8px;">
+                            <button onclick="window.eliminaJob('${data.id}', '${data.storage_path}', '${data.tenant || 'DNR'}')" style="background:#fee2e2; color:#ef4444; border:none; padding:8px; border-radius:8px; cursor:pointer;" title="Elimina Job e DDT associati">
+                                <span class="material-icons-round" style="font-size:18px;">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (hasNewAnomalies) {
+                Swal.fire({
+                    title: 'Nuove Anomalie Rilevate!',
+                    html: combinedMsg,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Vai a Gestione Anomalie',
+                    cancelButtonText: 'Ignora per ora',
+                    confirmButtonColor: '#ef4444',
+                    width: '600px'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.navigateWithState('gestione_anomalie.html');
+                    }
+                });
+            }
+
+            jobsList.innerHTML = html;
+
+            if (loadedDNR && loadedGC && loadedCattel && loadedDac) {
+                initialLoad = false;
+            }
+        }
+
+        // Ascolto in realtime della coda dei job (ultimi 10 per ciascun tenant)
+        function listenToJobs() {
+            document.getElementById('jobs-area').style.display = 'block';
+            
+            // Sottoscrizione DNR
+            subscribeToProcessingJobs('DNR', 10, (snapshot) => {
+                activeJobsDNR = [];
+                snapshot.forEach(doc => activeJobsDNR.push({ id: doc.id, ...doc.data() }));
+                loadedDNR = true;
+                renderMergedJobs();
+            });
+
+            // Sottoscrizione GRAND CHEF
+            subscribeToProcessingJobs('GRAN CHEF', 10, (snapshot) => {
+                activeJobsGC = [];
+                snapshot.forEach(doc => activeJobsGC.push({ id: doc.id, ...doc.data() }));
+                loadedGC = true;
+                renderMergedJobs();
+            });
+
+            // Sottoscrizione CATTEL
+            subscribeToProcessingJobs('CATTEL', 10, (snapshot) => {
+                activeJobsCattel = [];
+                snapshot.forEach(doc => activeJobsCattel.push({ id: doc.id, ...doc.data() }));
+                loadedCattel = true;
+                renderMergedJobs();
+            });
+
+            // Sottoscrizione DAC
+            subscribeToProcessingJobs('DAC', 10, (snapshot) => {
+                activeJobsDac = [];
+                snapshot.forEach(doc => activeJobsDac.push({ id: doc.id, ...doc.data() }));
+                loadedDac = true;
+                renderMergedJobs();
+            });
+        }
+
+        window.generaReport = async () => {
+            const btn = document.getElementById('btn-genera-report');
+            const dateInput = document.getElementById('master-date-selector').value;
+            if (!dateInput) return alert("Seleziona una data nel calendario.");
+            
+            const formattedDate = dateInput.split('-').reverse().join('-');
+            
+            // ANALISI PRE-VOLO
+            try {
+                Swal.fire({ title: 'Analisi pre-volo in corso...', didOpen: () => Swal.showLoading() });
+                const preflightFn = httpsCallable(functions, 'preflight_elaborazione_mappe');
+                const preflightRes = await preflightFn({ data_consegna: formattedDate });
+                Swal.close();
+                
+                const data = preflightRes.data;
+                if (data.status !== 'ok') {
+                    return Swal.fire('Errore', data.message || 'Errore durante il pre-volo', 'error');
+                }
+                
+                const in_elab = data.in_elaborazione || {};
+                const esist = data.elaborati_esistenti || {};
+                const dati_disponibili = esist;
+                const nuovi_da_elaborare = Object.keys(in_elab).filter(k => in_elab[k]);
+                const fornitori_misti = Object.keys(esist).filter(k => esist[k]);
+                const viaggi_esistenti = fornitori_misti.length > 0;
+                const contaminazione = data.contaminazione || false;
+                
+                if (nuovi_da_elaborare.length === 0) {
+                     return Swal.fire('Nessun Dato', 'Non ci sono nuovi file di dati (in split_ddt) da elaborare per questa giornata.', 'info');
+                }
+                
+                let title = "Elaborazione Mappe";
+                let htmlMsg = "";
+                
+                // Scenario C: Contaminazione
+                if (contaminazione) {
+                     title = "ATTENZIONE: Possibile Perdita Dati!";
+                     htmlMsg = `Hai caricato i dati per <b>${nuovi_da_elaborare.join(", ")}</b>.<br><br>Tuttavia, i viaggi attuali contengono fornitori misti: <b>${fornitori_misti.join(", ")}</b> nello stesso giro.<br>Dato che la procedura andrà a cancellare e sovrascrivere l'intero viaggio, <span style="color:#ef4444;font-weight:bold;">perderai anche i dati degli altri fornitori</span> presenti in quei viaggi mischiati!<br><br><b>Ti consigliamo vivamente di ANNULLARE e ricaricare insieme tutti i file dei fornitori coinvolti.</b>`;
+                } 
+                // Scenario A e B
+                else {
+                    if (!viaggi_esistenti) {
+                        htmlMsg = `Stai per elaborare i dati di: <b>${nuovi_da_elaborare.join(", ")}</b>.<br>Verranno generate nuove mappe da zero.`;
+                    } else {
+                        const untouched = Object.keys(dati_disponibili).filter(k => dati_disponibili[k] && !nuovi_da_elaborare.includes(k));
+                        let untouchedMsg = untouched.length > 0 ? `<br><br><span style="color:#10b981;font-weight:bold;">I giri di ${untouched.join(", ")} già elaborati rimarranno intatti.</span>` : "";
+                        
+                        htmlMsg = `Hai già dei viaggi elaborati per questa data.<br><br>I giri di <b>${nuovi_da_elaborare.join(", ")}</b> verranno <b>sovrascritti completamente</b> (tabula rasa) con i nuovi dati appena caricati.${untouchedMsg}`;
+                    }
+                }
+                
+                const confirmRes = await Swal.fire({
+                    title: title,
+                    html: htmlMsg,
+                    icon: contaminazione ? 'warning' : 'info',
+                    showCancelButton: true,
+                    confirmButtonColor: contaminazione ? '#ef4444' : '#3b82f6',
+                    cancelButtonColor: '#64748b',
+                    confirmButtonText: 'Avvia Elaborazione',
+                    cancelButtonText: 'Annulla'
+                });
+                
+                if (!confirmRes.isConfirmed) return;
+                
+            } catch (err) {
+                Swal.close();
+                console.error("Errore nel preflight:", err);
+                return Swal.fire('Errore', 'Si è verificato un errore durante l\'analisi pre-volo.', 'error');
+            }
+
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-icons-round">sync</span> GENERAZIONE IN CORSO...';
+            
+            try {
+                const generaReportFn = httpsCallable(functions, 'genera_report_giornaliero', { timeout: 300000 });
+                const result = await generaReportFn({ 
+                    data_consegna: formattedDate,
+                    tipologie_da_elaborare: window.ultime_tipologie_caricate || [] 
+                });
+                
+                if (result.data.status === 'ok') {
+                    console.log("Report generato con successo!");
+                    window.navigateWithState('mappa_zone.html?data=' + formattedDate + '&cb=' + Date.now());
+                } else {
+                    alert("Errore durante la generazione: " + result.data.message);
+                }
+            } catch (err) {
+                console.error("Errore chiamata report:", err);
+                alert("Errore di sistema nella generazione del report.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        };
+
+        window.cancellaGiornata = async function(data_consegna) {
+            const result = await Swal.fire({
+                title: 'TABULA RASA',
+                html: `Stai per eliminare <b>completamente</b> la giornata del <b>${data_consegna}</b>.<br><br>Verranno cancellati tutti i file, le mappe e i giri generati.<br><span style="color:#10b981;font-weight:700;">Clienti e articoli NON verranno toccati.</span>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: '&#x1F5D1; Si, cancella tutto',
+                cancelButtonText: 'Annulla',
+                reverseButtons: true
+            });
+            if (!result.isConfirmed) return;
+
+            // Mostra clessidra bloccante finché l'operazione non termina
+            Swal.fire({
+                title: 'Eliminazione in corso...',
+                html: `Sto cancellando tutti i dati del <b>${data_consegna}</b>.<br>Attendere prego.`,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            try {
+                const eliminaGiornataFn = httpsCallable(functions, 'elimina_giornata_logistica');
+                const elimResult = await eliminaGiornataFn({ data_consegna: data_consegna, soft_delete: true });
+                if (elimResult.data && elimResult.data.status === 'ok') {
+                    Swal.fire({
+                        title: 'Archiviata!',
+                        text: `La giornata del ${data_consegna} è stata rimossa dall'elenco attivo. I dati sono conservati intatti su Cloud per i primi 2 mesi.`,
+                        icon: 'success',
+                        timer: 3000,
+                        showConfirmButton: false
+                    });
+                } else {
+                    Swal.fire('Errore', elimResult.data ? elimResult.data.message : 'Errore sconosciuto', 'error');
+                }
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Errore', error.message, 'error');
+            }
+        };
+
+        window.cancellaGiornataTotale = async function(data_consegna) {
+            // HARD DELETE — rimuove Storage + Firestore completamente
+            const result = await Swal.fire({
+                title: '⚠️ ELIMINAZIONE DEFINITIVA',
+                html: `Stai per eliminare <b>DEFINITIVAMENTE</b> tutti i dati del <b>${data_consegna}</b>.<br><br>
+                       Verranno rimossi:<br>
+                       • File PDF e JSON dallo Storage<br>
+                       • Mappe e report<br>
+                       • Record giri e viaggi da Firestore<br><br>
+                       <span style="color:#dc2626;font-weight:700;">⚠️ Questa operazione è IRREVERSIBILE.<br>I dati fatturazione non verranno toccati.</span><br><br>
+                       Digita <b>${data_consegna}</b> per confermare:`,
+                input: 'text',
+                inputPlaceholder: `es. ${data_consegna}`,
+                icon: 'error',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: '🗑️ Elimina tutto definitivamente',
+                cancelButtonText: 'Annulla',
+                reverseButtons: true,
+                preConfirm: (inputVal) => {
+                    if (inputVal !== data_consegna) {
+                        Swal.showValidationMessage(`Devi digitare esattamente: ${data_consegna}`);
+                        return false;
+                    }
+                    return true;
+                }
+            });
+            if (!result.isConfirmed) return;
+
+            Swal.fire({
+                title: 'Eliminazione definitiva in corso...',
+                html: `Rimozione completa di tutti i dati del <b>${data_consegna}</b>.<br>Attendere prego.`,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            try {
+                const eliminaFn = httpsCallable(functions, 'elimina_giornata_logistica');
+                const elimResult = await eliminaFn({ data_consegna: data_consegna, soft_delete: false });
+                if (elimResult.data && elimResult.data.status === 'ok') {
+                    Swal.fire({
+                        title: 'Eliminato!',
+                        text: `Tutti i dati della giornata del ${data_consegna} sono stati rimossi definitivamente.`,
+                        icon: 'success',
+                        timer: 3000,
+                        showConfirmButton: false
+                    });
+                } else {
+                    Swal.fire('Errore', elimResult.data ? elimResult.data.message : 'Errore sconosciuto', 'error');
+                }
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Errore', error.message, 'error');
+            }
+        };
+
+        function listenToReports() {
+            // Esegui in background il controllo mensile di archiviazione R&D (3° mese)
+            setTimeout(async () => {
+                try {
+                    const archiviaFn = httpsCallable(functions, 'gestisci_archiviazione_mensile');
+                    const res = await archiviaFn({});
+                    if (res.data && res.data.status === 'ok' && res.data.giornate_archiviate?.length > 0) {
+                        Swal.fire({
+                            title: 'Backup R&D Completato',
+                            html: `È stato generato e verificato con successo il backup storico per <b>${res.data.giornate_archiviate.length}</b> giornate operative (inizio 3° mese) in <b>ARCHIVIO_STORICO_RD/</b>.`,
+                            icon: 'info',
+                            confirmButtonColor: '#4f46e5'
+                        });
+                    }
+                } catch (e) { console.warn("Archiviazione mensile automatica check:", e); }
+            }, 3000);
+
+            const activeTenant = localStorage.getItem('activeTenant') || 'DNR';
+            subscribeToReportsLogistici(activeTenant, (snapshot) => {
+                const reportsList = document.getElementById('reports-list');
+                let docsData = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.archiviato_ui) return; // Soft Delete visivo!
+                    docsData.push(data);
+                });
+                
+                // ORDINAMENTO AUTOMATICO PER DATA DI CONSEGNA (data_consegna: DD-MM-YYYY)
+                docsData.sort((a, b) => {
+                    const parseDate = (dStr) => {
+                        if (!dStr || !dStr.includes('-')) return 0;
+                        const parts = dStr.split('-');
+                        if (parts[0].length === 2) {
+                            return parseInt(`${parts[2]}${parts[1]}${parts[0]}`, 10);
+                        }
+                        return parseInt(`${parts[0]}${parts[1]}${parts[2]}`, 10);
+                    };
+                    return parseDate(b.data_consegna) - parseDate(a.data_consegna); // Ordine decrescente (più recenti in alto)
+                });
+
+                let html = '';
+                docsData.forEach(data => {
+                    html += `
+                        <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                            <div>
+                                <div style="font-weight: 700; color: #1e293b;">Mappa Zone del ${data.data_consegna}</div>
+                                <div style="font-size: 12px; color: #64748b;">${data.punti_totali} punti in ${data.zone_totali} zone</div>
+                            </div>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+
+                                <button onclick="window.navigateWithState('mappa_zone.html?data=${data.data_consegna}&cb=' + Date.now())" style="background: linear-gradient(135deg, var(--primary), #3730a3); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s;">
+                                    <span class="material-icons-round">edit_location</span> GESTIONE VIAGGI
+                                </button>
+
+                                <button onclick="window.cancellaGiornata('${data.data_consegna}')" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s;" title="Archivia visivamente (dati conservati su Cloud)">
+                                    <span class="material-icons-round">archive</span> CANCELLA GIORNATA
+                                </button>
+
+                                <button onclick="window.cancellaGiornataTotale('${data.data_consegna}')" style="background: #1e293b; color: #f87171; border: 2px solid #ef4444; padding: 8px 16px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s;" title="Elimina DEFINITIVAMENTE tutti i dati (Storage + Firestore)">
+                                    <span class="material-icons-round">delete_forever</span> ELIMINA TUTTO
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                if (!html) html = '<div style="padding:20px;text-align:center;color:#64748b;">Nessuna giornata logistica attiva presente.</div>';
+                reportsList.innerHTML = html;
+            });
+        }
+
+
+        const selector = document.getElementById('master-date-selector');
+        const lockBtn = document.getElementById('lock-date-btn');
+        const lockIcon = document.getElementById('lock-icon');
+        
+        document.getElementById('btn-gestione-mappa-data').addEventListener('click', () => {
+            const dateInput = document.getElementById('master-date-selector').value;
+            if (!dateInput) return alert("Seleziona una data nel calendario in alto.");
+            const formattedDate = dateInput.split('-').reverse().join('-');
+            window.navigateWithState('mappa_zone.html?data=' + formattedDate + '&cb=' + Date.now());
+        });
+        
+        document.getElementById('btn-elimina-giornata-data').addEventListener('click', async () => {
+            const dateInput = document.getElementById('master-date-selector').value;
+            if (!dateInput) return Swal.fire('Attenzione', 'Seleziona una data nel calendario in alto.', 'warning');
+            const formattedDate = dateInput.split('-').reverse().join('-');
+            
+            const conf = await Swal.fire({
+                title: 'Sei sicuro?',
+                text: `Stai per eliminare COMPLETAMENTE e DEFINITIVAMENTE tutti i dati del ${formattedDate}. L'operazione NON può essere annullata.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Sì, elimina tutto',
+                cancelButtonText: 'Annulla'
+            });
+
+            if (conf.isConfirmed) {
+                try {
+                    Swal.fire({ title: 'Eliminazione in corso...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                    const eliminaFn = httpsCallable(functions, 'elimina_giornata_logistica');
+                    const elimResult = await eliminaFn({ data_consegna: formattedDate, soft_delete: false });
+                    if (elimResult.data && elimResult.data.status === 'ok') {
+                        await Swal.fire('Eliminata!', 'La giornata è stata eliminata con successo.', 'success');
+                        location.reload();
+                    } else {
+                        Swal.fire('Errore', "Errore durante l'eliminazione: " + (elimResult.data ? elimResult.data.message : "Sconosciuto"), 'error');
+                    }
+                } catch (err) {
+                    Swal.fire('Errore', "Errore di rete o server: " + err.message, 'error');
+                }
+            }
+        });
+        
+        const savedDate = localStorage.getItem('master_date');
+        const isLocked = localStorage.getItem('master_date_locked') === 'true';
+        
+        if (savedDate) {
+            selector.value = savedDate;
+        } else {
+            selector.value = new Date().toISOString().split('T')[0];
+        }
+        
+        if (isLocked) {
+            selector.disabled = true;
+            lockIcon.innerText = 'lock';
+            lockBtn.style.background = 'var(--primary)';
+            lockBtn.style.color = 'white';
+        }
+        
+        document.getElementById('reports-area').style.display = 'block';
+        listenToReports();
+        listenToJobs(); // Listen for jobs from load
+        
+        selector.addEventListener('change', () => {
+            localStorage.setItem('master_date', selector.value);
+        });
+        
+        lockBtn.addEventListener('click', () => {
+            const nowLocked = selector.disabled;
+            if (nowLocked) {
+                selector.disabled = false;
+                lockIcon.innerText = 'lock_open';
+                lockBtn.style.background = 'none';
+                lockBtn.style.color = 'var(--primary)';
+                localStorage.setItem('master_date_locked', 'false');
+            } else {
+                selector.disabled = true;
+                lockIcon.innerText = 'lock';
+                lockBtn.style.background = 'var(--primary)';
+                lockBtn.style.color = 'white';
+                localStorage.setItem('master_date_locked', 'true');
+                localStorage.setItem('master_date', selector.value);
+            }
+        });
+
+        document.getElementById('btn-avvia').addEventListener('click', async () => {
+            const dateInput = document.getElementById('master-date-selector').value;
+            if (!dateInput) {
+                alert("⚠️ Seleziona una data nel calendario in alto prima di caricare i file.");
+                return;
+            }
+            const dateFormatted = dateInput.split('-').reverse().join('-');
+            let loadedClients = [];
+            let tipologie_caricate = [];
+            window.ultime_tipologie_caricate = tipologie_caricate;
+            let tenant_caricati = [];
+            let cliente_zona_caricati = [];
+            
+            if (filesFrutta.length > 0) {
+                loadedClients.push('Frutta');
+                tipologie_caricate.push('FRUTTA');
+                tenant_caricati.push('DNR');
+                cliente_zona_caricati.push('PROGETTO SCUOLE');
+            }
+            if (filesLatte.length > 0) {
+                loadedClients.push('Latte');
+                tipologie_caricate.push('LATTE');
+                tenant_caricati.push('DNR');
+                cliente_zona_caricati.push('PROGETTO SCUOLE');
+            }
+            if (filesChef.length > 0) {
+                loadedClients.push('Gran Chef');
+                tipologie_caricate.push('GRAND_CHEF');
+                tenant_caricati.push('GRAN CHEF');
+                cliente_zona_caricati.push('GRAN CHEF');
+            }
+            if (filesCattel.length > 0) {
+                loadedClients.push('Cattel');
+                tipologie_caricate.push('CATTEL');
+                tenant_caricati.push('CATTEL');
+                cliente_zona_caricati.push('CATTEL');
+            }
+            if (filesDac.length > 0) {
+                loadedClients.push('DAC');
+                tipologie_caricate.push('DAC');
+                tenant_caricati.push('DAC');
+                cliente_zona_caricati.push('DAC');
+            }
+
+            if (loadedClients.length === 0) {
+                alert("Nessun file selezionato per il caricamento.");
+                return;
+            }
+            
+            const clientsStr = loadedClients.join(', ');
+
+            const confirmDateRes = await Swal.fire({
+                title: 'Conferma Data Caricamento',
+                html: `Stai caricando i dati di <b>${clientsStr}</b> per la giornata del:<br><br><span style="font-size: 24px; font-weight: bold; color: #ef4444;">${dateFormatted}</span><br><br>Sei sicuro che la data sia corretta?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3b82f6',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Sì, carica dati',
+                cancelButtonText: 'Annulla'
+            });
+
+            if (!confirmDateRes.isConfirmed) {
+                return;
+            }
+
+            document.getElementById('btn-avvia').style.display = 'none';
+            document.getElementById('progress-area').style.display = 'block';
+            
+            const totalFiles = filesFrutta.length + filesLatte.length + filesChef.length + filesCattel.length + filesDac.length;
+            let currentUploaded = 0;
+            
+            const fillDiv = document.getElementById('progress-fill');
+            const percText = document.getElementById('progress-percentage');
+            const statText = document.getElementById('progress-status-text');
+
+            try {
+                // 1. PULIZIA PREVENTIVA SELETTIVA
+                statText.textContent = `Pulizia preventiva dei vecchi dati (${clientsStr})...`;
+                console.log('[Upload] Inizio pulizia preventiva per:', tipologie_caricate);
+                const eliminaGiornataFn = httpsCallable(functions, 'elimina_giornata_logistica', { timeout: 120000 });
+                
+                await eliminaGiornataFn({
+                    data_consegna: dateFormatted,
+                    soft_delete: false,
+                    tipologie_da_eliminare: tipologie_caricate,
+                    tenant_da_eliminare: tenant_caricati,
+                    cliente_zona_da_eliminare: cliente_zona_caricati
+                });
+
+                console.log('[Upload] Pulizia completata. Inizio caricamento file.');
+
+                // Upload Frutta
+                for (let file of filesFrutta) {
+                    statText.textContent = `Caricamento Frutta: ${file.name} (${currentUploaded + 1}/${totalFiles})...`;
+                    await uploadFileToStorage(file, "Frutta");
+                    currentUploaded++;
+                    let progress = (currentUploaded / totalFiles) * 100;
+                    fillDiv.style.width = progress + '%';
+                    percText.textContent = Math.round(progress) + '%';
+                }
+
+                // Upload Latte
+                for (let file of filesLatte) {
+                    statText.textContent = `Caricamento Latte: ${file.name} (${currentUploaded + 1}/${totalFiles})...`;
+                    await uploadFileToStorage(file, "Latte");
+                    currentUploaded++;
+                    let progress = (currentUploaded / totalFiles) * 100;
+                    fillDiv.style.width = progress + '%';
+                    percText.textContent = Math.round(progress) + '%';
+                }
+
+                // Upload Chef
+                for (let file of filesChef) {
+                    statText.textContent = `Caricamento Gran Chef: ${file.name} (${currentUploaded + 1}/${totalFiles})...`;
+                    await uploadFileToStorage(file, "GRAND_CHEF");
+                    currentUploaded++;
+                    let progress = (currentUploaded / totalFiles) * 100;
+                    fillDiv.style.width = progress + '%';
+                    percText.textContent = Math.round(progress) + '%';
+                }
+
+                // Upload Cattel
+                for (let file of filesCattel) {
+                    statText.textContent = `Caricamento Cattel: ${file.name} (${currentUploaded + 1}/${totalFiles})...`;
+                    await uploadFileToStorage(file, "CATTEL");
+                    currentUploaded++;
+                    let progress = (currentUploaded / totalFiles) * 100;
+                    fillDiv.style.width = progress + '%';
+                    percText.textContent = Math.round(progress) + '%';
+                }
+                
+                // Upload DAC
+                for (let file of filesDac) {
+                    statText.textContent = `Caricamento DAC: ${file.name} (${currentUploaded + 1}/${totalFiles})...`;
+                    await uploadFileToStorage(file, "DAC");
+                    currentUploaded++;
+                    let progress = (currentUploaded / totalFiles) * 100;
+                    fillDiv.style.width = progress + '%';
+                    percText.textContent = Math.round(progress) + '%';
+                }
+                
+                statText.textContent = "Trasferimento completato! I Job sono stati messi in coda sul cloud...";
+                
+                // Reset dello stato locale in-place
+                filesFrutta.length = 0;
+                filesLatte.length = 0;
+                filesChef.length = 0;
+                filesCattel.length = 0;
+                filesDac.length = 0;
+                
+                // Forza l'aggiornamento grafico dei contenitori a vuoto
+                document.getElementById('container-frutta').innerHTML = '';
+                document.getElementById('container-latte').innerHTML = '';
+                document.getElementById('container-chef').innerHTML = '';
+                document.getElementById('container-cattel').innerHTML = '';
+                
+                // Ripristina lo stile originario delle drop zones
+                document.getElementById('zone-frutta').style.background = 'rgba(255, 255, 255, 0.5)';
+                document.getElementById('zone-frutta').style.borderColor = '';
+                document.getElementById('zone-latte').style.background = 'rgba(255, 255, 255, 0.5)';
+                document.getElementById('zone-latte').style.borderColor = '';
+                document.getElementById('zone-chef').style.background = 'rgba(255, 255, 255, 0.5)';
+                document.getElementById('zone-chef').style.borderColor = '';
+                document.getElementById('zone-cattel').style.background = 'rgba(255, 255, 255, 0.5)';
+                document.getElementById('zone-cattel').style.borderColor = '';
+
+                checkReadyState();
+
+                setTimeout(() => {
+                    document.getElementById('progress-area').style.display = 'none';
+                    document.getElementById('btn-avvia').style.display = 'flex';
+                }, 1500);
+
+            } catch (error) {
+                console.error("Errore di caricamento:", error);
+                alert("Errore durante il caricamento: " + error.message);
+                document.getElementById('btn-avvia').style.display = 'flex';
+                document.getElementById('progress-area').style.display = 'none';
+                checkReadyState();
+            }
+        });
+
+        // Le vecchie Cloud Function sincrone (es. lanciaCloudFunction) sono state rimosse 
+        // a favore dell'approccio Job Worker Asincrono in realtime via Firestore.
+    </script>
+</body>
+</html>
+

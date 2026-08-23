@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Anagrafiche - Log Solution</title>
+    <link rel="stylesheet" href="styles.css?v=6.408">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <!-- Leaflet per Mappe -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        .tabs-header {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-muted);
+            white-space: nowrap;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+
+        /* Forza larghezza minima per colonne importanti nella vista tabella (creata in JS) */
+        .glass-table th:nth-child(3), .glass-table td:nth-child(3) { min-width: 200px; white-space: normal; } /* Nome Consegna */
+        .glass-table th:nth-child(4), .glass-table td:nth-child(4) { min-width: 250px; white-space: normal; } /* Indirizzo */
+        .glass-table th:nth-child(8), .glass-table td:nth-child(8) { min-width: 120px; } /* Lat/Lon */
+        .glass-table th:nth-child(9), .glass-table td:nth-child(9) { min-width: 150px; } /* Orari */
+
+        @media (max-width: 600px) {
+            .cards-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .btn-add {
+            background: var(--primary);
+            color: white;
+            border: none;
+            height: 45px;
+            padding: 0 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+
+        .btn-add:hover {
+            background: var(--primary-hover);
+            transform: scale(1.02);
+        }
+
+        #modalMap {
+            height: 300px;
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 12px;
+            border: 1px solid #e2e8f0;
+            grid-column: span 2;
+        }
+
+        .btn-map {
+            background: #10b981;
+            color: white;
+            border: none;
+            height: 45px;
+            padding: 0 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+
+        .btn-map:hover {
+            background: #059669;
+            transform: scale(1.02);
+        }
+
+        /* Card Layout */
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+            margin-top: 12px;
+        }
+
+        .item-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .item-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 10px 25px -10px rgba(79, 70, 229, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 12px;
+            padding-right: 80px; /* Spazio per i pulsanti assoluti */
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .card-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--text-main);
+            margin: 0;
+        }
+
+        .card-body {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .card-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .data-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .data-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        .data-value {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .card-actions {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-edit, .btn-delete {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+        }
+        .btn-edit:hover { background: #f8fafc; border-color: var(--primary); }
+        .btn-delete:hover { background: #fef2f2; border-color: #ef4444; }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 16px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            grid-column: span 3;
+        }
+
+        .input-group label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .input-group input, .input-group select {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        .orari-inputs {
+            display: flex;
+            gap: 8px;
+        }
+
+        @media (max-width: 900px) {
+            .form-grid { 
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 20px !important;
+            }
+            .input-group { 
+                grid-column: auto !important;
+                width: 100% !important;
+            }
+            .orari-inputs {
+                flex-direction: column;
+                gap: 12px;
+            }
+            /* Assicura che anche la mappa sia a tutta larghezza */
+            #modalMap {
+                width: 100% !important;
+                grid-column: auto !important;
+            }
+        }
+
+        #modalMap {
+            height: 250px;
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 12px;
+            border: 1px solid #e2e8f0;
+            grid-column: span 6;
+        }
+
+        /* Scrollbar personalizzata */
+        .data-table-container::-webkit-scrollbar {
+            height: 8px;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="glass-nav">
+        <div class="nav-content">
+            <img src="img/logo.png" alt="LS" style="height: 32px; width: auto; margin-right: 8px;">
+            <button id="dashboardBtn" class="logout-btn" title="Dashboard"
+                onclick="window.navigateWithState('dashboard.html')"
+                style="border:none; background:none; cursor:pointer; margin-right:8px; display:flex;">
+                <span class="material-icons-round">dashboard</span>
+            </button>
+            <div class="nav-title" style="flex: 1;">Gestione Anagrafiche</div>
+            <button id="updateBtn" class="btn-map" style="display:none; background:#f59e0b; padding:6px 10px; font-size:11px; margin-right:8px;" onclick="updateApp()">
+                <span class="material-icons-round">update</span> AGGIORNA
+            </button>
+            <a href="#" onclick="window.logoutFirebase(); return false;" class="logout-btn" title="Esci"><span class="material-icons-round">logout</span></a>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="tabs-header">
+            <button class="tab-btn active" onclick="switchTab('clienti')">
+                <span class="material-icons-round">group</span> Clienti
+            </button>
+            <button class="tab-btn" onclick="switchTab('articoli')">
+                <span class="material-icons-round">inventory_2</span> Articoli
+            </button>
+            <button class="tab-btn" onclick="switchTab('rientri')">
+                <span class="material-icons-round">assignment_return</span> Rientri DDT
+            </button>
+        </div>
+
+        <div class="glass-panel" style="padding: 24px;">
+
+
+            <div class="filters-container" style="margin-bottom: 20px;">
+                <div class="input-group" style="flex:1;">
+                    <input type="text" id="searchInput" placeholder="Cerca cliente, codice o città ..." onkeyup="filterTable()" style="width:100%;">
+                </div>
+                <div class="input-group">
+                    <select id="brandFilter" onchange="filterTable()" style="min-width: 160px; height: 45px; cursor: pointer;">
+                        <option value="">Tutti i Fornitori</option>
+                        <option value="DNR">DNR</option>
+                        <option value="CATTEL">CATTEL</option>
+                        <option value="DAC">DAC</option>
+                        <option value="GRAN CHEF">GRAN CHEF</option>
+                    </select>
+                </div>
+                <div class="action-buttons" style="display:flex; gap:12px;">
+                    <button id="btnShowMap" class="btn-map" onclick="window.navigateWithState('mappa_google.html')">
+                        <span class="material-icons-round">map</span> Mappa
+                    </button>
+                    <button class="btn-add" onclick="openModal()">
+                        <span class="material-icons-round">add</span> Aggiungi
+                    </button>
+                </div>
+            </div>
+
+            <div id="dataContainer" class="cards-container">
+                <!-- Card dinamiche -->
+            </div>
+            
+            <div id="loading" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <span class="material-icons-round" style="font-size: 40px; animation: spin 2s linear infinite;">autorenew</span>
+                <p>Caricamento dati...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modale Aggiunta/Modifica -->
+    <div id="crudModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 id="modalTitle" style="margin: 0;">Aggiungi Nuovo</h3>
+                <button onclick="closeModal()" style="border: none; background: none; cursor: pointer; color: var(--text-muted);">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+            
+            <form id="crudForm">
+                <div id="formFields" class="form-grid">
+                    <!-- Campi dinamici basati sul tab attivo -->
+                </div>
+                
+                <div style="margin-top: 32px; display: flex; gap: 12px;">
+                    <button type="button" onclick="closeModal()" class="tab-btn" style="flex: 1; justify-content: center;">Annulla</button>
+                    <button type="submit" class="btn-primary" style="flex: 2; box-shadow: none;">Salva nel Database</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js?v=6.408"></script>
+    <script type="module" src="firebase-auth-sync.js?v=6.408"></script>
+    <script type="module">
+        import { db } from "./core/firebase-init.js";
+        import { getFirestore, collection, collectionGroup, onSnapshot, query, orderBy, doc, deleteDoc, setDoc, addDoc, getDocsFromCache } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { firebaseConfig } from "./firebase-config.js";
+        import { subscribeToAnagrafica } from "./services/anagraficheService.js";
+        import { connectivityService } from "./core/connectivity-service.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
+        
+        const functions = getFunctions(app, 'europe-west1');
+
+
+
+        let currentTab = 'clienti';
+        let unsubscribes = [];
+
+        window.onUserProfileLoaded = function(user) {
+            loadData();
+        };
+
+        function clearUnsubscribes() {
+            unsubscribes.forEach(unsub => { if(typeof unsub === 'function') unsub(); });
+            unsubscribes = [];
+        }
+
+        window.switchTab = function(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText.toLowerCase().includes(tab));
+            });
+            
+            // Gestione visibilità  pulsante Mappa e filtro brand
+            const btnMap = document.getElementById('btnShowMap');
+            if(btnMap) {
+                btnMap.style.display = (tab === 'clienti') ? 'flex' : 'none';
+            }
+            const brandSelect = document.getElementById('brandFilter');
+            if(brandSelect) {
+                brandSelect.style.display = (tab === 'clienti') ? 'inline-block' : 'none';
+            }
+            const rubricaAlert = document.getElementById('rubricaClientiAlert');
+            if(rubricaAlert) {
+                rubricaAlert.style.display = (tab === 'clienti') ? 'flex' : 'none';
+            }
+
+            loadData();
+        };
+
+        function loadData() {
+            clearUnsubscribes();
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('dataContainer').innerHTML = '';
+            
+            if(currentTab === 'clienti') {
+                let dnrData = [];
+                let gcData = [];
+                let cattelData = [];
+                let dacData = [];
+                
+                // 1. LETTURA ISTANTANEA DA CACHE LOCAL INDEXEDDB (Cache-First per zero attese)
+                console.log("[DEBUG CACHE] Tento getDocsFromCache immediato per rendering istantaneo...");
+                getDocsFromCache(query(collection(db, 'clienti/DNR/raccolta clienti'))).then(snapshot => {
+                    if (snapshot && snapshot.docs.length > 0) {
+                        const debugMsg = `DNR letto da Direct Cache: ${snapshot.docs.length} record.`;
+                        console.log("[DEBUG CACHE DIRECT]", debugMsg);
+
+                        dnrData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, tenant: 'DNR' }));
+                        window.fullData = [...dnrData, ...gcData, ...cattelData, ...dacData];
+                        document.getElementById('loading').style.display = 'none';
+                        filterTable();
+                    }
+                }).catch(e => console.warn("Direct Cache DNR non pronta:", e));
+
+                getDocsFromCache(query(collection(db, 'clienti/GRAN CHEF/raccolta clienti'))).then(snapshot => {
+                    if (snapshot && snapshot.docs.length > 0) {
+                        gcData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, tenant: 'GRAN CHEF' }));
+                        window.fullData = [...dnrData, ...gcData, ...cattelData, ...dacData];
+                        document.getElementById('loading').style.display = 'none';
+                        filterTable();
+                    }
+                }).catch(e => console.warn("Direct Cache GC non pronta:", e));
+
+                getDocsFromCache(query(collection(db, 'clienti/CATTEL/raccolta clienti'))).then(snapshot => {
+                    if (snapshot && snapshot.docs.length > 0) {
+                        cattelData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, tenant: 'CATTEL' }));
+                        window.fullData = [...dnrData, ...gcData, ...cattelData, ...dacData];
+                        document.getElementById('loading').style.display = 'none';
+                        filterTable();
+                    }
+                }).catch(e => console.warn("Direct Cache CATTEL non pronta:", e));
+
+                getDocsFromCache(query(collection(db, 'clienti/DAC/raccolta clienti'))).then(snapshot => {
+                    if (snapshot && snapshot.docs.length > 0) {
+                        dacData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, tenant: 'DAC' }));
+                        window.fullData = [...dnrData, ...gcData, ...cattelData, ...dacData];
+                        document.getElementById('loading').style.display = 'none';
+                        filterTable();
+                    }
+                }).catch(e => console.warn("Direct Cache DAC non pronta:", e));
+
+                const unsubDNR = subscribeToAnagrafica('clienti/DNR/raccolta clienti', (snapshot) => {
+                    const debugMsg = `DNR scattato: ${snapshot.docs.length} record. (Cache: ${snapshot.metadata.fromCache})`;
+                    console.log("[DEBUG OFFLINE]", debugMsg);
+                    if(window.showDebug) window.showDebug(debugMsg);
+
+                    dnrData = snapshot.docs.map(doc => {
+                        const d = doc.data();
+                        return { ...d, id: doc.id, tenant: 'DNR' };
+                    });
+                    window.fullData = [...dnrData, ...gcData, ...cattelData, ...dacData];
+                    document.getElementById('loading').style.display = 'none';
+                    filterTable();
+                }, (error) => {
+                    console.error("Errore caricamento clienti DNR:", error);
+                    document.getElementById('loading').style.display = 'none';
+                });
+                unsubscribes.push(unsubDNR);
+                
+                const unsubGC = subscribeToAnagrafica('clienti/GRAN CHEF/raccolta clienti', (snapshot) => {
+                    const debugMsg = `GC scattato: ${snapshot.docs.length} record. (Cache: ${snapshot.metadata.fromCache})`;
+                    console.log("[DEBUG OFFLINE]", debugMsg);
+                    if(window.showDebug) window.showDebug(debugMsg);
+
+                    gcData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, tenant: 'GRAN CHEF' }));
+                    window.fullData = [...dnrData, ...gcData, ...cattelData, ...dacData];
+                    document.getElementById('loading').style.display = 'none';
+                    filterTable();
+                }, (error) => {
+                    console.error("Errore caricamento clienti GRAN CHEF:", error);
+                    document.getElementById('loading').style.display = 'none';
+                });
+                unsubscribes.push(unsubGC);
+
+                const unsubCattel = subscribeToAnagrafica('clienti/CATTEL/raccolta clienti', (snapshot) => {
+                    const debugMsg = `CATTEL scattato: ${snapshot.docs.length} record. (Cache: ${snapshot.metadata.fromCache})`;
+                    console.log("[DEBUG OFFLINE]", debugMsg);
+                    if(window.showDebug) window.showDebug(debugMsg);
+
+                    cattelData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, tenant: 'CATTEL' }));
+                    window.fullData = [...dnrData, ...gcData, ...cattelData, ...dacData];
+                    document.getElementById('loading').style.display = 'none';
+                    filterTable();
+                }, (error) => {
+                    console.error("Errore caricamento clienti CATTEL:", error);
+                    document.getElementById('loading').style.display = 'none';
+                });
+                unsubscribes.push(unsubCattel);
+
+                const unsubDac = subscribeToAnagrafica('clienti/DAC/raccolta clienti', (snapshot) => {
+                    const debugMsg = `DAC scattato: ${snapshot.docs.length} record. (Cache: ${snapshot.metadata.fromCache})`;
+                    console.log("[DEBUG OFFLINE]", debugMsg);
+                    if(window.showDebug) window.showDebug(debugMsg);
+
+                    dacData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, tenant: 'DAC' }));
+                    window.fullData = [...dnrData, ...gcData, ...cattelData, ...dacData];
+                    document.getElementById('loading').style.display = 'none';
+                    filterTable();
+                }, (error) => {
+                    console.error("Errore caricamento clienti DAC:", error);
+                    document.getElementById('loading').style.display = 'none';
+                });
+                unsubscribes.push(unsubDac);
+            } else {
+                let collPath = '';
+                const activeTenant = localStorage.getItem('activeTenant') || 'DNR';
+                if(currentTab === 'articoli') collPath = `clienti/${activeTenant}/codici articoli`;
+                if(currentTab === 'rientri') {
+                    // Lettura multi-tenant dinamica usando collectionGroup
+                    const q = query(collectionGroup(db, 'rientri ddt'));
+                    const unsub = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+                        document.getElementById('loading').style.display = 'none';
+                        window.fullData = snapshot.docs.map(doc => {
+                            // Extract tenant from path: clienti/{tenant}/rientri ddt/{id}
+                            const pathSegments = doc.ref.path.split('/');
+                            const tenant = pathSegments.length >= 3 ? pathSegments[1] : 'UNKNOWN';
+                            return { id: doc.id, tenant: tenant, ...doc.data() };
+                        });
+                        filterTable();
+                    }, (error) => {
+                        console.error("Errore caricamento rientri:", error);
+                        document.getElementById('loading').style.display = 'none';
+                    });
+                    unsubscribes.push(unsub);
+                    return; // saltiamo il subscribeToAnagrafica generico
+                }
+                
+                const unsub = subscribeToAnagrafica(collPath, (snapshot) => {
+                    document.getElementById('loading').style.display = 'none';
+                    window.fullData = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                    filterTable();
+                }, (error) => {
+                    console.error("Errore caricamento:", error);
+                    document.getElementById('loading').style.display = 'none';
+                });
+                unsubscribes.push(unsub);
+            }
+        }
+
+        function renderTable(data) {
+            const container = document.getElementById('dataContainer');
+            container.innerHTML = '';
+            
+            if(currentTab === 'clienti') {
+                container.innerHTML = data.map(d => `
+                    <div class="item-card">
+                        <div class="card-header">
+                            <div>
+                                <h4 class="card-title">${d.cliente || d.nome_consegna || 'N/A'}</h4>
+                                <div style="display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;">
+                                    <span class="badge badge-frutta">F: ${d.codice_frutta || '-'}</span>
+                                    <span class="badge badge-latte">L: ${d.codice_latte || '-'}</span>
+                                    <span class="badge" style="background:#f1f5f9; color:#64748b">ZONA: ${d.codice_zona || d.zona || '-'}</span>
+                                    <span class="badge" style="background:${d.tenant === 'GRAN CHEF' ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : (d.tenant === 'CATTEL' ? '#0284c7' : (d.tenant === 'DAC' ? '#8b5cf6' : '#1e293b'))}; color:white">${d.tenant || 'DNR'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="card-row">
+                                <div class="data-item" style="flex:2">
+                                    <span class="data-label">Indirizzo</span>
+                                    <span class="data-value">${d.indirizzo || ''}</span>
+                                </div>
+                                <div class="data-item" style="flex:1">
+                                    <span class="data-label">Città  / Prov</span>
+                                    <span class="data-value">${d.citta || ''} (${d.provincia || d.prov || '-'})</span>
+                                </div>
+                            </div>
+                            <div class="card-row" style="background:#f8fafc; padding:8px; border-radius:8px;">
+                                <div class="data-item">
+                                    <span class="data-label">Orari Frutta</span>
+                                    <span class="data-value">${d.orario_min_frutta || '-'}/${d.orario_max_frutta || '-'}</span>
+                                </div>
+                                <div class="data-item" style="border-left:1px solid #e2e8f0; padding-left:16px;">
+                                    <span class="data-label">Orari Latte</span>
+                                    <span class="data-value">${d.orario_min_latte || '-'}/${d.orario_max_latte || '-'}</span>
+                                </div>
+                                <div class="data-item" style="border-left:1px solid #e2e8f0; padding-left:16px;">
+                                    <span class="data-label">Coordinate GPS</span>
+                                    <span class="data-value">${d.lat ? parseFloat(d.lat).toFixed(4) : '-'}/${d.lon ? parseFloat(d.lon).toFixed(4) : '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                             <button class="btn-edit" onclick="editItem('${d.id}')" title="Modifica dati">
+                                <span class="material-icons-round" style="font-size:18px;">edit</span>
+                             </button>
+                             <button class="btn-delete" onclick="window.deleteItem('${d.id}')" title="Elimina record">
+                                <span class="material-icons-round" style="font-size:18px; color: #ef4444;">delete</span>
+                             </button>
+                             <button class="btn-edit" onclick="window.navigateWithState('mappa_google.html?id=${d.id}')" title="Geolocalizza (Google Maps)">
+                                <span class="material-icons-round" style="font-size:18px; color:#10b981;">my_location</span>
+                             </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else if(currentTab === 'articoli') {
+                container.innerHTML = data.map(d => `
+                    <div class="item-card">
+                        <div class="card-actions">
+                             <button class="btn-edit" onclick="editItem('${d.id}')" title="Modifica">
+                                <span class="material-icons-round" style="font-size:18px;">edit</span>
+                             </button>
+                             <button class="btn-delete" onclick="window.deleteItem('${d.id}')" title="Elimina">
+                                <span class="material-icons-round" style="font-size:18px; color: #ef4444;">delete</span>
+                             </button>
+                        </div>
+                        <div class="card-header">
+                            <div>
+                                <h4 class="card-title">${d.id}</h4>
+                                <p style="font-size:13px; font-weight:600; color:var(--primary); margin:4px 0 0 0;">${d.descrizione || ''}</p>
+                                <span class="badge" style="background:#e0e7ff; color:#4f46e5; margin-top:4px; display:inline-block;">Famiglia: ${d.famiglia || 'Non assegnata'}</span>
+                            </div>
+                        </div>
+                        <div class="card-grid">
+                            <div class="data-item">
+                                <span class="data-label">Confezione</span>
+                                <span class="data-value">${d.confezionamento || '-'}</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">U. Principale</span>
+                                <span class="data-value">${d.unita_principale || '-'} (${d.per || '1'})</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">U. Secondaria</span>
+                                <span class="data-value">${d.unita_secondaria || '-'}</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">Ratio / Porz.</span>
+                                <span class="data-value">${d.ratio || '1'} / ${d.porzioni || '-'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } else if(currentTab === 'rientri') {
+                 container.innerHTML = data.map(d => {
+                    console.log("[DEBUG RIENTRI] Documento intero:", d);
+                    console.log("[DEBUG RIENTRI] Chiavi disponibili:", Object.keys(d));
+                    
+                    const codice = d['Codice consegna'] || d.id;
+                    const ddt = d['Data e Num DDT'] || '';
+                    const stato = d['Stato'] || '';
+                    const tipo = (d['Tipo'] || '').toLowerCase();
+                    const note = d['Note'] || '';
+                    const isParziale = tipo === 'parziale';
+                    
+                    return `
+                    <div class="item-card${isParziale ? ' parziale' : ''}">
+                        <div class="card-header">
+                            <div>
+                                <h4 class="card-title">${codice}</h4>
+                                <p style="font-size:12px; color:var(--text-muted); margin:0;">${ddt}</p>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-end;">
+                                ${stato ? `<span class="badge badge-stato">${stato}</span>` : ''}
+                                ${isParziale ? `<span class="badge badge-parziale">âš ï¸ parziale</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="data-item" style="grid-column: span 12;">
+                                <span class="data-label">Note</span>
+                                <span class="data-value" style="white-space: pre-wrap;">${note || '-'}</span>
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                             <button class="btn-edit" onclick="editItem('${d.id}')" title="Modifica">
+                                <span class="material-icons-round" style="font-size:18px;">edit</span>
+                             </button>
+                             <button class="btn-delete" onclick="window.deleteItem('${d.id}')" title="Elimina">
+                                <span class="material-icons-round" style="font-size:18px; color: #ef4444;">delete</span>
+                             </button>
+                        </div>
+                    </div>
+                `;}).join('');
+            }
+        }
+
+        // --- GESTIONE CRUD MODALE ---
+        window.openModal = function() {
+            const modal = document.getElementById('crudModal');
+            const title = document.getElementById('modalTitle');
+            const fields = document.getElementById('formFields');
+            const form = document.getElementById('crudForm');
+            
+            form.reset();
+            modal.classList.add('active');
+                      if(currentTab === 'clienti') {
+                title.innerText = "Nuovo Cliente";
+                fields.innerHTML = `
+                    <!-- 0. CANALE -->
+                    <div class="input-group" style="grid-column: span 6">
+                        <label>Canale / Master</label>
+                        <select name="tenant">
+                            <option value="DNR">DNR</option>
+                            <option value="CATTEL">CATTEL</option>
+                        <option value="DAC">DAC</option>
+                            <option value="GRAN CHEF">GRAN CHEF</option>
+                        </select>
+                    </div>
+                    <div class="input-group" style="grid-column: span 6"></div>
+
+                    <!-- 1. CODICI -->
+                    <div class="input-group">
+                        <label>Codice Frutta</label>
+                        <input type="text" name="codice_frutta" placeholder="es: p2000">
+                    </div>
+                    <div class="input-group">
+                        <label>Codice Latte</label>
+                        <input type="text" name="codice_latte" placeholder="es: p2000">
+                    </div>
+
+                    <!-- 2. ANAGRAFICA -->
+                    <div class="input-group" style="grid-column: span 6">
+                        <label>Nome Consegna (Scuola)</label>
+                        <input type="text" name="cliente" required>
+                    </div>
+                    <div class="input-group" style="grid-column: span 6">
+                        <label>Indirizzo (Via e Civico)</label>
+                        <input type="text" name="indirizzo" placeholder="es: Via Roma 10">
+                    </div>
+
+                    <!-- 3. GEOGRAFIA -->
+                    <div class="input-group" style="grid-column: span 2">
+                        <label>Città </label>
+                        <input type="text" name="citta">
+                    </div>
+                    <div class="input-group" style="grid-column: span 2">
+                        <label>Provincia</label>
+                        <input type="text" name="provincia" maxlength="2" placeholder="PD">
+                    </div>
+                    <div class="input-group" style="grid-column: span 2">
+                        <label>Zona (Giro)</label>
+                        <input type="text" name="codice_zona" placeholder="es: PD1">
+                    </div>
+
+                    <!-- 4. ORARI -->
+                    <div class="input-group" style="grid-column: span 3">
+                        <label>Orario Frutta (Min/Max)</label>
+                        <div class="orari-inputs">
+                            <input type="text" name="orario_min_frutta" placeholder="08:00">
+                            <input type="text" name="orario_max_frutta" placeholder="10:00">
+                        </div>
+                    </div>
+                    <div class="input-group" style="grid-column: span 3">
+                        <label>Orario Latte (Min/Max)</label>
+                        <div class="orari-inputs">
+                            <input type="text" name="orario_min_latte" placeholder="08:00">
+                            <input type="text" name="orario_max_latte" placeholder="10:00">
+                        </div>
+                    </div>
+
+                    <!-- 5. GPS -->
+                    <div class="input-group" style="grid-column: span 3">
+                        <label>Latitudine</label>
+                        <input type="text" name="lat" readonly style="background:#f8fafc">
+                    </div>
+                    <div class="input-group" style="grid-column: span 3">
+                        <label>Longitudine</label>
+                        <input type="text" name="lon" readonly style="background:#f8fafc">
+                    </div>
+                    
+                    <div style="grid-column: span 6; margin-top: 12px;">
+                        <button type="button" id="btnUnlockMarker" onclick="unlockMarker()" class="btn-edit" style="width:100%; justify-content:center; background:#f1f5f9; color:var(--primary); border: 1px dashed var(--primary)">
+                            <span class="material-icons-round">lock</span> SBLOCCA MARKER PER MODIFICA POSIZIONE
+                        </button>
+                        <div id="modalMap"></div>
+                    </div>
+                `;
+                setTimeout(() => initMap(), 300);
+            } else if(currentTab === 'articoli') {
+                title.innerText = "Nuovo Articolo";
+                fields.innerHTML = `
+                    <div class="input-group" style="grid-column: span 6">
+                        <label>Codice Articolo (ID)</label>
+                        <input type="text" name="id" required placeholder="es: AL-T-LI-NA">
+                    </div>
+                    <div class="input-group" style="grid-column: span 6">
+                        <label>Descrizione Estesa</label>
+                        <input type="text" name="descrizione" required>
+                    </div>
+                    <div class="input-group" style="grid-column: span 6">
+                        <label>Famiglia</label>
+                        <select name="famiglia">
+                            <option value="LATTE">LATTE</option>
+                            <option value="FRUTTA">FRUTTA</option>
+                            <option value="ALTRO">ALTRO (es. Attrezzatura)</option>
+                        </select>
+                    </div>
+                    <div class="input-group" style="grid-column: span 3">
+                        <label>Confezionamento</label>
+                        <input type="text" name="confezionamento" placeholder="es: Busta 5kg">
+                    </div>
+                    <div class="input-group" style="grid-column: span 3">
+                        <label>Unità  Principale</label>
+                        <input type="text" name="unita_principale" placeholder="es: KG">
+                    </div>
+                    <div class="input-group" style="grid-column: span 2">
+                        <label>Per (Quantità )</label>
+                        <input type="number" name="per" step="0.01" value="1">
+                    </div>
+                    <div class="input-group" style="grid-column: span 2">
+                        <label>Unità  Secondaria</label>
+                        <input type="text" name="unita_secondaria" placeholder="es: PZ">
+                    </div>
+                    <div class="input-group" style="grid-column: span 2">
+                        <label>Ratio (Resa)</label>
+                        <input type="number" name="ratio" step="0.01" value="1">
+                    </div>
+                    <div class="input-group" style="grid-column: span 6">
+                        <label>Porzioni (Note)</label>
+                        <input type="text" name="porzioni" placeholder="es: 100g">
+                    </div>
+                `;
+            } else {
+                title.innerText = "Nuovo Rientro";
+                fields.innerHTML = `
+                    <div class="input-group">
+                        <label>Codice Consegna</label>
+                        <input type="text" name="Codice consegna" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Data e Num DDT</label>
+                        <input type="text" name="Data e Num DDT" placeholder="es: 19/05/2026_FNS1234">
+                    </div>
+                    <div class="input-group">
+                        <label>Stato allegato</label>
+                        <input type="text" name="Stato" placeholder="es: allegato DDT 19-05-2026">
+                    </div>
+                    <div class="input-group">
+                        <label>Tipo</label>
+                        <select name="Tipo" style="padding:10px; border-radius:8px; border:1px solid #e2e8f0; font-size:14px; width:100%; font-family:inherit;">
+                            <option value="">completo</option>
+                            <option value="parziale">parziale</option>
+                        </select>
+                    </div>
+                    <div class="input-group" style="grid-column: span 12;">
+                        <label>Note / Dettagli</label>
+                        <textarea name="Note" rows="2" placeholder="Dettagli da consegnare / ritirare..." style="padding:10px; border-radius:8px; border:1px solid #e2e8f0; font-size:14px; width:100%; font-family:inherit;"></textarea>
+                    </div>
+                `;
+            }
+        };
+
+        window.closeModal = () => document.getElementById('crudModal').classList.remove('active');
+
+        document.getElementById('crudForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formEl = e.target;
+            const formData = new FormData(formEl);
+            const data = Object.fromEntries(formData.entries());
+            const formId = formEl.dataset.id; // L'ID del record in modifica (se esiste)
+
+            try {
+                let collPath = '';
+                let docId = formId || null;
+                
+                if(currentTab === 'clienti') {
+                    let formVal = data.tenant || 'DNR';
+                    let tenant = 'DNR';
+                    if (formVal === 'CATTEL') {
+                        data.tipo = 'CATTEL';
+                        data.tipologia_grado = 'CATTEL';
+                        tenant = 'CATTEL';
+                    } else if (formVal === 'DAC') {
+                        data.tipo = 'DAC';
+                        data.tipologia_grado = 'DAC';
+                        tenant = 'DAC';
+                    } else if (formVal === 'GRAN CHEF') {
+                        data.tipo = 'GRAN CHEF';
+                        data.tipologia_grado = 'GRAND_CHEF';
+                        tenant = 'GRAN CHEF';
+                    } else {
+                        data.tipo = 'DNR';
+                        data.tipologia_grado = 'DNR';
+                        tenant = 'DNR';
+                    }
+                    data.tenant = tenant;
+
+                    collPath = `clienti/${tenant}/raccolta clienti`;
+                    docId = docId || data.codice_frutta || data.codice_latte || null;
+                } else if(currentTab === 'articoli') {
+                    const activeTenant = localStorage.getItem('activeTenant') || 'DNR';
+                    collPath = `clienti/${activeTenant}/codici articoli`;
+                    docId = docId || data.id;
+                    delete data.id;
+                } else if (currentTab === 'rientri') {
+                    // 1. Pulizia e formattazione input
+                    const rawDataStr = (data['Data e Num DDT'] || '').replace(/\s+/g, '').replace(/\//g, '-').toUpperCase();
+                    if(!rawDataStr) throw new Error("Compila Data e Num DDT (formato GG-MM-AAAA_NUMERO)");
+                    
+                    const codice = (data['Codice consegna'] || '').trim();
+                    if(!codice) throw new Error("Codice consegna mancante.");
+                    
+                    // Validazione Tipo / Nota
+                    const tipo = (data['Tipo'] || '').toUpperCase();
+                    if(tipo === 'PARZIALE' && !(data['Note'] || '').trim()) {
+                        throw new Error("La nota è obbligatoria per i rientri PARZIALI.");
+                    }
+                    
+                    // 2. Risoluzione tenant via Cloud Function
+                    Swal.fire({ title: 'Risoluzione Cliente...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                    const resolveFn = httpsCallable(functions, 'risolvi_tenant_consegna');
+                    const resolveResult = await resolveFn({ codice_consegna: codice });
+                    const resData = resolveResult.data;
+                    
+                    if (resData.status !== 'ok') {
+                        if (resData.message === 'CODICE_NON_TROVATO') throw new Error(`Il codice consegna ${codice} non è stato trovato in nessuna anagrafica.`);
+                        if (resData.message === 'CODICE_AMBIGUO') throw new Error(`Il codice consegna ${codice} è duplicato in più anagrafiche. Risolvere l'ambiguità prima di procedere.`);
+                        throw new Error("Errore durante la risoluzione del cliente.");
+                    }
+                    
+                    const resolvedTenant = resData.tenant;
+                    collPath = `clienti/${resolvedTenant}/rientri ddt`;
+                    
+                    // 3. Preparazione Payload Pulito
+                    docId = docId || `${codice}_${rawDataStr}`;
+                    
+                    const cleanPayload = {
+                        tenant: resolvedTenant,
+                        rientro_id: docId,
+                        codice_consegna: codice,
+                        data_ddt: rawDataStr.split('_')[0] || '',
+                        numero_ddt: rawDataStr.split('_')[1] || '',
+                        "Data e Num DDT": rawDataStr,
+                        tipo: tipo,
+                        note: data['Note'] || '',
+                        stato: (data['Stato'] || 'DA ALLEGARE').toLowerCase(),
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    };
+                    
+                    // Sostituiamo completamente l'oggetto data per non scrivere campi sporchi (es. is_parziale)
+                    for (let key in data) delete data[key];
+                    Object.assign(data, cleanPayload);
+                }
+                
+                if(docId) {
+                    await setDoc(doc(db, collPath, docId), data, { merge: true });
+                } else {
+                    await addDoc(collection(db, collPath), data);
+                }
+                
+                alert("Salvataggio completato con successo!");
+                closeModal();
+            } catch (err) {
+                console.error("Errore salvataggio:", err);
+                alert("Errore durante il salvataggio: " + err.message);
+            }
+        });
+
+        window.deleteItem = async function(id) {
+            if(!confirm("âš ï¸ ATTENZIONE: Sei sicuro di voler eliminare questo record definitivamente dal database?")) return;
+            
+            let collPath = '';
+            if(currentTab === 'clienti') {
+                const item = (window.fullData || []).find(c => c.id === id);
+                const tenant = item ? item.tenant : 'DNR';
+                collPath = `clienti/${tenant}/raccolta clienti`;
+            }
+            const activeTenant = localStorage.getItem('activeTenant') || 'DNR';
+            if(currentTab === 'articoli') collPath = `clienti/${activeTenant}/codici articoli`;
+            if(currentTab === 'rientri') {
+                const item = (window.fullData || []).find(r => r.id === id);
+                if (!item || !item.tenant) {
+                    alert("Errore: impossibile identificare il tenant di questo rientro.");
+                    return;
+                }
+                collPath = `clienti/${item.tenant}/rientri ddt`;
+            }
+            
+            try {
+                await deleteDoc(doc(db, collPath, id));
+                console.log("[Anagrafica] Record eliminato:", id);
+            } catch (err) {
+                console.error("Errore eliminazione:", err);
+                alert("Errore durante l'eliminazione: " + err.message);
+            }
+        };
+
+        window.filterTable = function() {
+            const q = document.getElementById('searchInput').value.toLowerCase().trim();
+            const brand = document.getElementById('brandFilter')?.value || '';
+            if(!window.fullData) return;
+            let filtered = window.fullData;
+            
+            if (currentTab === 'clienti' && brand) {
+                filtered = filtered.filter(d => {
+                    const t = d.tenant || 'DNR';
+                    return t === brand;
+                });
+            }
+            
+            if (q) {
+                filtered = filtered.filter(d => {
+                    return Object.values(d).some(val => String(val).toLowerCase().includes(q));
+                });
+            }
+            
+            renderTable(filtered);
+        }
+
+        let map = null;
+        let marker = null;
+
+        function initMap(lat = 45.4064, lon = 11.8768) {
+            if(map) map.remove();
+            const mapContainer = document.getElementById('modalMap');
+            if(!mapContainer) return;
+            
+            const isDefault = (lat === 45.4064 && lon === 11.8768);
+            map = L.map('modalMap').setView([lat, lon], isDefault ? 14 : 18);
+            
+            // Mappa Satellitare Ibrida (Satellite + Nomi Strade di Google Maps)
+            L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                attribution: 'Â© Google Maps (Ibrida/Satellitare)'
+            }).addTo(map);
+            
+            // Marker BLOCCATO di default
+            marker = L.marker([lat, lon], {draggable: false}).addTo(map);
+            
+            marker.on('dragend', function() {
+                const pos = marker.getLatLng();
+                const form = document.getElementById('crudForm');
+                form.querySelector('[name="lat"]').value = pos.lat.toFixed(6);
+                form.querySelector('[name="lon"]').value = pos.lng.toFixed(6);
+            });
+
+            map.on('click', function(e) {
+                if(!marker.dragging.enabled()) return; // Non fare nulla se bloccato
+                marker.setLatLng(e.latlng);
+                const form = document.getElementById('crudForm');
+                form.querySelector('[name="lat"]').value = e.latlng.lat.toFixed(6);
+                form.querySelector('[name="lon"]').value = e.latlng.lng.toFixed(6);
+            });
+        }
+
+        window.unlockMarker = function() {
+            if(!marker) return;
+            marker.dragging.enable();
+            const btn = document.getElementById('btnUnlockMarker');
+            btn.innerHTML = '<span class="material-icons-round">lock_open</span> MARKER SBLOCCATO - TRASCINA O CLICCA SULLA MAPPA';
+            btn.style.background = "#dcfce7";
+            btn.style.color = "#166534";
+            btn.style.border = "1px solid #166534";
+            
+            // Forza focus sulla mappa
+            document.getElementById('modalMap').scrollIntoView({ behavior: 'smooth' });
+        };
+
+        window.editItem = function(id, focusMap = false) {
+            const item = (window.fullData || []).find(d => d.id === id);
+            if(!item) return;
+            openModal();
+            const form = document.getElementById('crudForm');
+            const title = document.getElementById('modalTitle');
+            
+            form.dataset.id = item.id;
+            title.innerText = focusMap ? "Geolocalizza Cliente" : "Modifica Record";
+            
+            Object.keys(item).forEach(key => {
+                const input = form.querySelector(`[name="${key}"]`);
+                if(input) input.value = item[key];
+            });
+
+            if(currentTab === 'clienti') {
+                const tenantSelect = form.querySelector('[name="tenant"]');
+                if (tenantSelect) tenantSelect.disabled = false;
+
+                const lat = parseFloat(item.lat) || 45.4064;
+                const lon = parseFloat(item.lon) || 11.8768;
+                setTimeout(() => {
+                    initMap(lat, lon);
+                    if(focusMap) {
+                        const mapEl = document.getElementById('modalMap');
+                        mapEl.scrollIntoView({ behavior: 'smooth' });
+                        mapEl.style.border = "2px solid #10b981";
+                    }
+                }, 350);
+            }
+            
+            if(currentTab === 'articoli') {
+                const idInput = form.querySelector('[name="id"]');
+                if(idInput) {
+                    idInput.value = item.id;
+                    idInput.readOnly = true;
+                }
+            }
+            if(currentTab === 'rientri') {
+                const chk = form.querySelector('[name="is_parziale"]');
+                if(chk) chk.checked = !!item.is_parziale;
+            }
+        };
+
+        window.navigateWithState = (url) => window.location.href = url;
+        
+        // Gestione Aggiornamento App
+        let registration = null;
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(reg => {
+                registration = reg;
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            document.getElementById('updateBtn').style.display = 'flex';
+                        }
+                    });
+                });
+            });
+
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                window.location.reload();
+            });
+        }
+
+        window.updateApp = function() {
+            if (registration && registration.waiting) {
+                registration.waiting.postMessage('SKIP_WAITING');
+            } else {
+                window.location.reload(true);
+            }
+        };
+        
+        if (window.appData && window.appData.currentUser && window.appData.currentUser.id) {
+            loadData();
+        }
+    </script>
+</body>
+</html>
+

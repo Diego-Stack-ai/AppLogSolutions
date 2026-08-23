@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invio Mobile Autisti — Log Solution</title>
+    <link rel="stylesheet" href="styles.css?v=6.408">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .page-header { margin-bottom: 28px; animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1); }
+        .page-header h1 { font-size: 26px; font-weight: 800; margin: 0;
+            background: linear-gradient(135deg, #4f46e5, #a855f7);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .page-header p { margin: 4px 0 0; color: var(--text-muted); font-size: 14px; }
+
+        .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+            flex-wrap: wrap; animation: slideUp 0.5s 0.1s both; }
+        .date-input { background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 700;
+            color: var(--primary); outline: none; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+        .date-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
+        .btn-genera-tutte { background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white; border: none; padding: 10px 20px; border-radius: 12px;
+            font-weight: 700; font-size: 13px; cursor: pointer; display: flex;
+            align-items: center; gap: 6px; transition: all 0.2s;
+            box-shadow: 0 4px 14px rgba(79,70,229,0.35); }
+        .btn-genera-tutte:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79,70,229,0.45); }
+        .btn-genera-tutte:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .badge-count { background: rgba(255,255,255,0.25); border-radius: 8px;
+            padding: 1px 6px; font-size: 11px; }
+
+        .viaggi-grid { display: flex; flex-direction: column; gap: 16px;
+            animation: slideUp 0.5s 0.15s both; }
+
+        .viaggio-card { background: white; border: 1px solid var(--border); border-radius: 20px;
+            overflow: hidden; transition: box-shadow 0.2s;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+        .viaggio-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.09); }
+
+        .card-header { display: flex; align-items: center; gap: 14px; padding: 16px 20px 12px; }
+        .zona-pill { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+        .card-title { font-weight: 800; font-size: 16px; color: #0f172a; flex: 1; }
+        .card-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+        .badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
+        .badge-info { background: #eff6ff; color: #1d4ed8; }
+        .badge-km  { background: #f0fdf4; color: #15803d; }
+        .badge-min { background: #fefce8; color: #b45309; }
+        .badge-ok  { background: #dcfce7; color: #166534; }
+
+        .card-punti { padding: 0 20px 10px; }
+        .punti-list { list-style: none; margin: 0; padding: 0; max-height: 180px;
+            overflow-y: auto; border-top: 1px solid #f1f5f9; padding-top: 8px; }
+        .punti-list li { font-size: 12px; color: #475569; padding: 4px 0;
+            display: flex; align-items: flex-start; gap: 6px; border-bottom: 1px solid #f8fafc; }
+        .punti-list li:last-child { border-bottom: none; }
+        .punti-list li span.num { width: 18px; height: 18px; background: #f1f5f9;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+
+        .card-actions { padding: 12px 20px 16px; display: flex; gap: 8px; flex-wrap: wrap;
+            border-top: 1px solid #f1f5f9; }
+        .btn-genera { background: #4f46e5; color: white; border: none;
+            padding: 9px 18px; border-radius: 10px; font-weight: 700; font-size: 13px;
+            cursor: pointer; display: flex; align-items: center; gap: 6px;
+            transition: all 0.2s; }
+        .btn-genera:hover { background: #4338ca; transform: translateY(-1px); }
+        .btn-genera:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-copia { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0;
+            padding: 9px 16px; border-radius: 10px; font-weight: 600; font-size: 13px;
+            cursor: pointer; display: flex; align-items: center; gap: 5px;
+            transition: all 0.2s; }
+        .btn-copia:hover { background: #e2e8f0; }
+        .btn-copia.copied { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .btn-wa { background: #25d366; color: white; border: none;
+            padding: 9px 16px; border-radius: 10px; font-weight: 700; font-size: 13px;
+            cursor: pointer; display: flex; align-items: center; gap: 6px;
+            transition: all 0.2s; text-decoration: none; }
+        .btn-wa:hover { background: #1da851; }
+        .btn-apri { background: #0ea5e9; color: white; border: none;
+            padding: 9px 14px; border-radius: 10px; font-weight: 600; font-size: 13px;
+            cursor: pointer; display: flex; align-items: center; gap: 5px;
+            transition: all 0.2s; text-decoration: none; }
+        .btn-apri:hover { background: #0284c7; }
+
+        .mappa-result { background: #f8faff; border: 1px solid #c7d2fe;
+            border-radius: 10px; padding: 10px 14px; margin: 0 20px 14px;
+            display: flex; align-items: center; gap: 8px; font-size: 12px; color: #4338ca;
+            word-break: break-all; }
+        .mappa-result span.mi { color: #6366f1; flex-shrink: 0; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+        .empty-state .material-icons-round { font-size: 64px; opacity: 0.3; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinning { animation: spin 1s linear infinite; }
+    </style>
+</head>
+<body>
+    <nav class="glass-nav">
+        <div class="nav-content">
+            <img src="img/logo.png" alt="LS" style="height:32px;width:auto;margin-right:8px;">
+            <button onclick="window.navigateWithState('elaborazione.html')"
+                style="border:none;background:none;cursor:pointer;margin-right:8px;display:flex;">
+                <span class="material-icons-round">arrow_back</span>
+            </button>
+            <div class="nav-title" style="flex:1;">Invio Mobile Autisti</div>
+            <a href="#" onclick="window.logoutFirebase(); return false;" class="logout-btn" title="Esci">
+                <span class="material-icons-round">logout</span>
+            </a>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <h1><span style="-webkit-text-fill-color:unset;font-size:28px;">📱</span> Invio Mobile Autisti</h1>
+                <p>Centrale Operativa — Gestione ordinaria autisti e consultazione/recupero backup R&D</p>
+            </div>
+            <!-- Dual Mode Toggle Tab -->
+            <div style="background: #f1f5f9; padding: 4px; border-radius: 14px; display: flex; gap: 4px; border: 1px solid #e2e8f0;">
+                <button id="tabOrdinaria" onclick="window.switchTab('ordinaria')" style="padding: 10px 20px; border-radius: 10px; border: none; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(79,70,229,0.2);">
+                    <span class="material-icons-round" style="font-size: 16px; vertical-align: middle; margin-right: 6px;">today</span> Gestione Ordinaria (2 Mesi)
+                </button>
+                <button id="tabRecupero" onclick="window.switchTab('recupero')" style="padding: 10px 20px; border-radius: 10px; border: none; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; background: transparent; color: #64748b;">
+                    <span class="material-icons-round" style="font-size: 16px; vertical-align: middle; margin-right: 6px;">cloud_download</span> Modalità Recupero Backup
+                </button>
+            </div>
+        </div>
+
+        <!-- Barra Strumenti Modalità Ordinaria -->
+        <div class="toolbar" id="toolbarOrdinaria">
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1; flex-wrap: wrap;">
+                <label style="font-size: 13px; font-weight: 700; color: #64748b;"><span class="material-icons-round" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">filter_alt</span> Mese Attivo:</label>
+                <!-- Menu a tendina intelligente per i 2 mesi in vigore -->
+                <select id="selectMeseOrdinario" onchange="window.onMeseOrdinarioChange(event)" style="height: 42px; border-radius: 12px; border: 1px solid var(--border); padding: 0 16px; font-size: 14px; font-weight: 700; color: var(--primary); outline: none; cursor: pointer; background: var(--surface); font-family: inherit;">
+                    <option value="">Caricamento mesi attivi...</option>
+                </select>
+                <input type="date" id="dateSelector" class="date-input" onchange="cambiaData(event)" title="Seleziona Data Specifica">
+            </div>
+            <button class="btn-genera-tutte" id="btnGeneraTutte" onclick="generaTutteMappe()">
+                <span class="material-icons-round">auto_awesome</span>
+                GENERA TUTTE LE MAPPE
+                <span class="badge-count" id="countBadge">0</span>
+            </button>
+        </div>
+
+        <!-- Barra Strumenti Modalità Recupero Backup (R&D) -->
+        <div class="toolbar" id="toolbarRecupero" style="display: none; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 16px; padding: 16px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1; flex-wrap: wrap;">
+                <label style="font-size: 13px; font-weight: 700; color: #b45309;"><span class="material-icons-round" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">inventory_2</span> Mese Storico:</label>
+                <select id="selectMeseRecupero" onchange="window.onMeseRecuperoChange(event)" style="height: 42px; border-radius: 12px; border: 1px solid #fde68a; padding: 0 16px; font-size: 14px; font-weight: 700; color: #b45309; outline: none; cursor: pointer; background: white; font-family: inherit;">
+                    <option value="">Caricamento archivio R&D...</option>
+                </select>
+                <label style="font-size: 13px; font-weight: 700; color: #b45309; margin-left: 8px;">Data Viaggio:</label>
+                <select id="selectDataRecupero" style="height: 42px; border-radius: 12px; border: 1px solid #fde68a; padding: 0 16px; font-size: 14px; font-weight: 700; color: #b45309; outline: none; cursor: pointer; background: white; font-family: inherit;">
+                    <option value="">Seleziona prima il mese...</option>
+                </select>
+                <button type="button" onclick="window.eseguiRecuperoStorico()" style="background: #b45309; color: white; border: none; height: 42px; padding: 0 20px; border-radius: 12px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(180,83,9,0.2);">
+                    <span class="material-icons-round" style="font-size: 18px;">restore</span> RECUPERA VIAGGIO
+                </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <button class="btn-genera-tutte" id="btnGeneraTutteRecupero" onclick="generaTutteMappe()" style="background: linear-gradient(135deg, #b45309, #d97706);">
+                    <span class="material-icons-round">auto_awesome</span>
+                    GENERA TUTTE LE MAPPE
+                    <span class="badge-count" id="countBadgeRecupero">0</span>
+                </button>
+                <button type="button" id="btnRilasciaRecupero" onclick="window.rilasciaRecuperoStorico()" style="display: none; background: #ef4444; color: white; border: none; height: 42px; padding: 0 20px; border-radius: 12px; font-weight: 700; font-size: 13px; cursor: pointer; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(239,68,68,0.2);">
+                    <span class="material-icons-round" style="font-size: 18px;">verified_user</span> RILASCIA VIAGGIO / CONCLUDI STUDIO
+                </button>
+            </div>
+        </div>
+
+        <div id="loadingState" class="empty-state">
+            <span class="material-icons-round spinning" style="font-size:48px;opacity:0.5;">sync</span>
+            <p>Caricamento viaggi in corso...</p>
+        </div>
+        <div id="errorState" class="empty-state" style="display:none;">
+            <span class="material-icons-round">error_outline</span>
+            <p id="errorMsg">Errore durante il caricamento.</p>
+        </div>
+        <div id="emptyState" class="empty-state" style="display:none;">
+            <span class="material-icons-round">route</span>
+            <h3>Nessun viaggio trovato</h3>
+            <p>Prima esegui CALCOLA PERCORSI dalla pagina Mappa & Percorsi.</p>
+            <button onclick="window.navigateWithState('elaborazione.html')"
+                style="margin-top:16px;background:#4f46e5;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:700;cursor:pointer;">
+                Torna all'elaborazione
+            </button>
+        </div>
+
+        <div id="documentiGenerali" style="display:none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                <h2 style="margin:0; font-size: 18px; display: flex; align-items: center; gap: 8px; color: #1e293b;">
+                    <span class="material-icons-round" style="color: #3b82f6;">folder_shared</span>
+                    Documenti Generali della Giornata
+                </h2>
+                <button id="btnGeneraRiepiloghi" onclick="window.generaRiepiloghiAziendali()" style="background: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);">
+                    <span class="material-icons-round" style="font-size: 18px;">picture_as_pdf</span> GENERA RIEPILOGHI AZIENDALI
+                </button>
+            </div>
+            
+            <div id="generalLinksContainer" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                <!-- Link verranno iniettati via JS -->
+            </div>
+            <div id="riepiloghiAziendaliContainer" style="margin-bottom: 24px;"></div>
+        </div>
+
+        <div class="viaggi-grid" id="viaggiGrid"></div>
+    </main>
+
+    <script src="script.js?v=6.408"></script>
+    <script type="module" src="firebase-auth-sync.js?v=6.408"></script>
+    <script type="module">
+        import { db, app } from "./core/firebase-init.js";
+        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
+        import { getStorage, ref as storageRef, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+        import { firebaseConfig } from "./firebase-config.js";
+
+        const functions = getFunctions(app, "europe-west1");
+        const storage = getStorage(app);
+
+        let viaggi = [];   // [{id, data}, ...]
+        let dataLavoro = "";
+        const activeTenant = localStorage.getItem('activeTenant') || 'DNR';
+
+        // ── init ──────────────────────────────────────────────────────────────
+        window.onUserProfileLoaded = async function() {
+            initMenuOrdinario(); // Avvia il filtro intelligente dei 2 mesi
+            dataLavoro = new URLSearchParams(location.search).get('data')
+                || localStorage.getItem('locked_date')
+                || "";
+            if (dataLavoro) localStorage.setItem('locked_date', dataLavoro);
+            
+            const dateInput = document.getElementById('dateSelector');
+            if (dataLavoro) {
+                // Il database e localStorage usano DD-MM-YYYY
+                // L'input type="date" vuole YYYY-MM-DD
+                if (dataLavoro.includes('-') && dataLavoro.split('-')[0].length === 2) {
+                    dateInput.value = dataLavoro.split('-').reverse().join('-');
+                } else {
+                    dateInput.value = dataLavoro;
+                }
+                await caricaViaggi();
+            } else {
+                // Caso: accesso diretto senza data, mostriamo stato di attesa invece di errore
+                document.getElementById('loadingState').style.display = 'none';
+                const empty = document.getElementById('emptyState');
+                empty.style.display = 'block';
+                empty.innerHTML = `
+                    <span class="material-icons-round">calendar_today</span>
+                    <h3>Scegli una data</h3>
+                    <p>Usa il calendario qui in alto per caricare i viaggi autisti.</p>
+                `;
+            }
+        };
+
+        window.cambiaData = async function(e) {
+            const rawDate = e.target.value; // Arriva come YYYY-MM-DD
+            if (!rawDate) return;
+            
+            // Converte in DD-MM-YYYY per coerenza col resto dell'app
+            dataLavoro = rawDate.split('-').reverse().join('-');
+            
+            localStorage.setItem('locked_date', dataLavoro);
+            
+            // Update URL search params senza ricaricare la pagina
+            const url = new URL(window.location);
+            url.searchParams.set('data', dataLavoro);
+            window.history.pushState({}, '', url);
+
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'none';
+            document.getElementById('viaggiGrid').innerHTML = '';
+            
+            await caricaViaggi();
+        }
+
+        async function caricaViaggi() {
+            try {
+                const q = query(
+                    collection(db, 'clienti', activeTenant, 'viaggi ddt'),
+                    where('data_lavoro', '==', dataLavoro)
+                );
+                const snap = await window.getDocsConFallback(q);
+                viaggi = snap.docs
+                    .map(d => ({ id: d.id, ...d.data() }))
+                    .filter(v => v.id_zona !== 'DDT_DA_INSERIRE')
+                    .sort((a, b) => (a.nome_giro || '').localeCompare(b.nome_giro || ''));
+                
+                // Precarica distinta_url dal DB
+                viaggi.forEach(v => {
+                    if (v.distinta_url) {
+                        v.distinta_light = v.distinta_url;
+                    }
+                });
+
+                // Integrazione manifest PDF (distinte_light) dal bucket Storage
+                const storagePathPrefix = activeTenant !== 'DNR' ? `${activeTenant}/REPORTS` : 'REPORTS';
+                try {
+                    const sRef = storageRef(storage, `${storagePathPrefix}/${dataLavoro}/manifest_link_viaggi.json`);
+                    const downloadUrl = await Promise.race([
+                        getDownloadURL(sRef),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout_Storage")), 2500))
+                    ]);
+                    
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 2500);
+                    const resManifest = await fetch(downloadUrl, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    
+                    if (resManifest.ok) {
+                        const manifest = await resManifest.json();
+                        if (manifest.links) {
+                            viaggi.forEach(v => {
+                                const mLink = manifest.links.find(l => l.v_id === v.nome_giro || l.v_id === v.id_zona);
+                                if (mLink) {
+                                    v.distinta_light = mLink.distinta_light || v.distinta_light || '';
+                                    v.distinta_completa = mLink.distinta_completa || '';
+                                }
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.log('Nessun manifest distinte trovato per oggi o errore lettura (offline):', e.message);
+                }
+
+                document.getElementById('loadingState').style.display = 'none';
+
+                // Verifica se sono viaggi recuperati per R&D
+                const isRecupero = viaggi.some(v => v.is_recupero_rd);
+                const btnRilascia = document.getElementById('btnRilasciaRecupero');
+                if (btnRilascia) {
+                    btnRilascia.style.display = isRecupero ? 'flex' : 'none';
+                }
+
+                if (viaggi.length === 0) {
+                    const empty = document.getElementById('emptyState');
+                    empty.style.display = 'block';
+                    empty.innerHTML = `
+                        <span class="material-icons-round">route</span>
+                        <h3>Nessun viaggio trovato</h3>
+                        <p>Non ci sono viaggi per la data ${dataLavoro}. Prima esegui CALCOLA PERCORSI dalla pagina Mappa & Percorsi.</p>
+                        <button onclick="window.navigateWithState('elaborazione.html')"
+                            style="margin-top:16px;background:#4f46e5;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:700;cursor:pointer;">
+                            Torna all'elaborazione
+                        </button>
+                    `;
+                    return;
+                }
+
+                document.getElementById('countBadge').textContent = viaggi.length;
+                if (document.getElementById('countBadgeRecupero')) {
+                    document.getElementById('countBadgeRecupero').textContent = viaggi.length;
+                }
+                
+                // Fetch info da reports_logistici
+                let reportMeta = null;
+                try {
+                    const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    const reportRef = doc(db, 'clienti', 'report_logistici', 'giornate', dataLavoro);
+                    const reportSnap = await window.getDocConFallback(reportRef);
+                    if (reportSnap.exists()) {
+                        reportMeta = reportSnap.data();
+                    }
+                } catch (er) {
+                    console.log('Errore lettura report_logistici:', er);
+                }
+                
+                renderDocumentiGenerali(reportMeta);
+                renderViaggi();
+            } catch (e) {
+                showError("Errore Firestore: " + e.message);
+            }
+        }
+        
+        function renderDocumentiGenerali(reportMeta) {
+            const container = document.getElementById('documentiGenerali');
+            const linksContainer = document.getElementById('generalLinksContainer');
+            const riepiloghiContainer = document.getElementById('riepiloghiAziendaliContainer');
+            if (linksContainer) linksContainer.innerHTML = '';
+            if (riepiloghiContainer) riepiloghiContainer.innerHTML = '';
+            
+            if (!reportMeta) {
+                if (container) container.style.display = 'none';
+                return;
+            }
+            
+            let hasMappa = false;
+            let hasRiepiloghi = false;
+            
+            if (reportMeta.mappa_url) {
+                hasMappa = true;
+                linksContainer.innerHTML += `
+                    <div style="width: 100%; display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <a href="${reportMeta.mappa_url}" target="_blank" style="background: #10b981; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);">
+                                <span class="material-icons-round" style="font-size: 18px;">map</span> APRI MAPPA GENERALE
+                            </a>
+                            <button class="btn-copia" id="copia-generale" onclick="window.copiaLink('generale','🗺️ Mappa generale percorsi: ${reportMeta.mappa_url}')" style="box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); padding: 10px 16px;">
+                                <span class="material-icons-round" style="font-size: 16px;">content_copy</span> Copia link
+                            </button>
+                            <a class="btn-wa" href="https://wa.me/?text=${encodeURIComponent('🗺️ Mappa generale percorsi: ' + reportMeta.mappa_url)}" target="_blank" style="box-shadow: 0 4px 12px rgba(37, 211, 102, 0.2); padding: 10px 16px;">
+                                <span class="material-icons-round" style="font-size: 16px;">chat</span> WhatsApp
+                            </a>
+                        </div>
+                        <div class="mappa-result" id="result-generale" style="margin: 0; max-width: 100%;">
+                            <span class="material-icons-round mi">link</span>
+                            <span>${reportMeta.mappa_url}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (reportMeta.riepiloghi_urls && Object.keys(reportMeta.riepiloghi_urls).length > 0) {
+                hasRiepiloghi = true;
+                let riepiloghiHtml = '<div style="display: flex; flex-wrap: wrap; gap: 12px;">';
+                
+                for (const [azienda, url] of Object.entries(reportMeta.riepiloghi_urls)) {
+                    riepiloghiHtml += `
+                        <a href="${url}" target="_blank" style="background: #ef4444; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);">
+                            <span class="material-icons-round" style="font-size: 18px;">picture_as_pdf</span> DISTINTE ${azienda}
+                        </a>
+                    `;
+                }
+                
+                riepiloghiHtml += '</div>';
+                if (riepiloghiContainer) riepiloghiContainer.innerHTML = riepiloghiHtml;
+            }
+
+            if (container) container.style.display = (hasMappa || hasRiepiloghi) ? 'block' : 'none';
+        }
+
+        window.generaRiepiloghiAziendali = async function() {
+            if (!dataLavoro) return;
+            const btn = document.getElementById('btnGeneraRiepiloghi');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = `<span class="material-icons-round spinning" style="font-size: 18px;">sync</span> GENERAZIONE...`;
+            btn.style.opacity = '0.7';
+            btn.disabled = true;
+            
+            try {
+                const fn = httpsCallable(functions, 'genera_riepiloghi_aziendali_light', { timeout: 120000 });
+                const res = (await fn({ data_consegna: dataLavoro, tenant: activeTenant })).data;
+                if (res.status === 'errore') throw new Error(res.message);
+                
+                // Aggiorniamo la UI richiamando caricaViaggi per estrarre di nuovo i metadati
+                await caricaViaggi();
+                alert(res.messaggio || "Riepiloghi generati con successo!");
+            } catch (e) {
+                alert("Errore generazione riepiloghi: " + e.message);
+            } finally {
+                btn.innerHTML = originalHtml;
+                btn.style.opacity = '1';
+                btn.disabled = false;
+            }
+        };
+
+        function renderViaggi() {
+            const grid = document.getElementById('viaggiGrid');
+            grid.innerHTML = '';
+            viaggi.forEach(v => {
+                const card = buildCard(v);
+                grid.appendChild(card);
+            });
+        }
+
+        function buildCard(v) {
+            const punti = v.punti_ottimizzati || v.punti || [];
+            const nPunti = punti.length;
+            const km = v.km_reali ? `${v.km_reali.toFixed(1)} km` : null;
+            const min = v.t_tot_min ? `${v.t_tot_min} min` : null;
+            const hasMappa = !!v.mappa_url;
+
+            const div = document.createElement('div');
+            div.className = 'viaggio-card';
+            div.id = `card-${v.id}`;
+
+            const puntiHtml = punti.slice(0, 12).map((p, i) => `
+                <li>
+                    <span class="num">${i+1}</span>
+                    <span>${p.nome || '—'}</span>
+                </li>`).join('') + (nPunti > 12 ? `<li style="color:#94a3b8;font-size:11px;">... e altri ${nPunti-12} punti</li>` : '');
+
+            div.innerHTML = `
+                <div class="card-header">
+                    <div class="zona-pill" style="background:${v.color||'#4f46e5'};"></div>
+                    <div class="card-title">${(() => {
+                        const c = v.cliente_zona || '';
+                        const n = v.nome_giro || v.id_zona;
+                        if (c && !n.toUpperCase().includes(c.toUpperCase())) {
+                            return c.toUpperCase() + ' - ' + n;
+                        }
+                        return n;
+                    })()}</div>
+                    <div class="card-badges">
+                        ${v.is_recupero_rd ? '<span class="badge" style="background:#fef3c7;color:#b45309;border:1px solid #fde68a;">⚠️ VIAGGIO STORICO RECUPERATO</span>' : ''}
+                        <span class="badge badge-info">${nPunti} fermate</span>
+                        ${km ? `<span class="badge badge-km">${km}</span>` : ''}
+                        ${min ? `<span class="badge badge-min">${min}</span>` : ''}
+                        ${hasMappa ? '<span class="badge badge-ok">✓ Mappa pronta</span>' : ''}
+                    </div>
+                </div>
+                <div class="card-punti">
+                    <ul class="punti-list">${puntiHtml}</ul>
+                </div>
+                ${hasMappa ? `<div class="mappa-result" id="result-${v.id}">
+                    <span class="material-icons-round mi">link</span>
+                    <span>${v.mappa_url}</span>
+                </div>` : `<div id="result-${v.id}" style="display:none;" class="mappa-result"></div>`}
+                <div class="card-actions">
+                    <button class="btn-genera" id="btn-${v.id}" onclick="window.generaMappa('${v.id}')">
+                        <span class="material-icons-round">directions_car</span>
+                        ${hasMappa ? 'RIGENERA MAPPA' : 'GENERA MAPPA'}
+                    </button>
+                    ${v.distinta_light ? `
+                    <a class="btn-apri" href="${v.distinta_light}" target="_blank" style="background: #f59e0b; color: white; padding: 0 10px; display: inline-flex; align-items: center; gap: 4px;" title="Apri Distinta">
+                        <span class="material-icons-round" style="font-size:16px;">description</span> Distinta
+                    </a>` : ''}
+                    ${v.distinta_completa ? `
+                    <a class="btn-apri" href="${v.distinta_completa}" target="_blank" style="background: #10b981; color: white; padding: 0 10px; display: inline-flex; align-items: center; gap: 4px;" title="Apri Distinta Completa">
+                        <span class="material-icons-round" style="font-size:16px;">picture_as_pdf</span> PDF Full
+                    </a>` : ''}
+                    ${hasMappa ? `
+                    <button class="btn-copia" id="copia-${v.id}" onclick="window.copiaLink('${v.id}','🗺️ Mappa percorso ${v.nome_giro}: ${v.mappa_url}${v.distinta_light ? '\\n📄 Distinta: ' + v.distinta_light : ''}')">
+                        <span class="material-icons-round" style="font-size:16px;">content_copy</span> Copia link
+                    </button>
+                    <a class="btn-wa" href="https://wa.me/?text=${encodeURIComponent('🗺️ Mappa percorso '+v.nome_giro+': '+v.mappa_url + (v.distinta_light ? '\n📄 Distinta: '+v.distinta_light : ''))}" target="_blank">
+                        <span class="material-icons-round" style="font-size:16px;">chat</span> WhatsApp
+                    </a>
+                    <a class="btn-apri" href="${v.mappa_url}" target="_blank" title="Apri Mappa">
+                        <span class="material-icons-round" style="font-size:16px;">map</span>
+                    </a>` : ''}
+                </div>`;
+            return div;
+        }
+
+        let activeTab = 'ordinaria';
+
+        window.switchTab = function(tab) {
+            activeTab = tab;
+            const tabOrd = document.getElementById('tabOrdinaria');
+            const tabRec = document.getElementById('tabRecupero');
+            const toolOrd = document.getElementById('toolbarOrdinaria');
+            const toolRec = document.getElementById('toolbarRecupero');
+
+            if (tab === 'ordinaria') {
+                tabOrd.style.background = 'var(--primary)';
+                tabOrd.style.color = 'white';
+                tabOrd.style.boxShadow = '0 2px 8px rgba(79,70,229,0.2)';
+                tabRec.style.background = 'transparent';
+                tabRec.style.color = '#64748b';
+                toolOrd.style.display = 'flex';
+                toolRec.style.display = 'none';
+                
+                // Svuota lo stato di R&D e ricarica i viaggi ordinari
+                document.getElementById('viaggiGrid').innerHTML = '';
+                document.getElementById('emptyState').style.display = 'none';
+                
+                if (dataLavoro) {
+                    document.getElementById('loadingState').style.display = 'block';
+                    caricaViaggi();
+                } else {
+                    document.getElementById('loadingState').style.display = 'none';
+                    const empty = document.getElementById('emptyState');
+                    empty.style.display = 'block';
+                    empty.innerHTML = `
+                        <span class="material-icons-round">calendar_today</span>
+                        <h3>Scegli una data</h3>
+                        <p>Usa il calendario qui in alto per caricare i viaggi autisti.</p>
+                    `;
+                }
+            } else {
+                tabRec.style.background = '#b45309';
+                tabRec.style.color = 'white';
+                tabRec.style.boxShadow = '0 2px 8px rgba(180,83,9,0.2)';
+                tabOrd.style.background = 'transparent';
+                tabOrd.style.color = '#64748b';
+                tabOrd.style.boxShadow = 'none';
+                toolOrd.style.display = 'none'; // Spegnimento totale della barra ordinaria in R&D
+                toolRec.style.display = 'flex';
+                
+                // Svuotamento istantaneo della griglia ordinaria per non creare confusione!
+                document.getElementById('viaggiGrid').innerHTML = '';
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('errorState').style.display = 'none';
+                const empty = document.getElementById('emptyState');
+                empty.style.display = 'block';
+                empty.innerHTML = `
+                    <span class="material-icons-round" style="color:#b45309;font-size:48px;">cloud_download</span>
+                    <h3 style="color:#b45309;margin-top:10px;">Modalità Recupero Backup R&D</h3>
+                    <p style="color:#b45309;">Archivio ordinario nascosto. Seleziona il mese e la data storica qui in alto per ripristinare i viaggi dal Caveau di Rinascita.</p>
+                `;
+
+                caricaMesiRecupero();
+            }
+        };
+
+        // ── FILTRO INTELLIGENTE GESTIONE ORDINARIA (2 MESI) ───────────────────
+        async function initMenuOrdinario() {
+            const selectMese = document.getElementById('selectMeseOrdinario');
+            if (!selectMese) return;
+            try {
+                const qRep = query(collection(db, 'clienti', 'report_logistici', 'giornate'));
+                const snap = await window.getDocsConFallback(qRep);
+                const mesiSet = new Set();
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    if (data.archiviato_ui || data.archiviato_storico_rd) return;
+                    if (data.data_consegna && data.data_consegna.includes('-')) {
+                        const parts = data.data_consegna.split('-');
+                        if (parts.length === 3) {
+                            mesiSet.add(`${parts[2]}-${parts[1]}`); // YYYY-MM
+                        }
+                    }
+                });
+                const mesiList = Array.from(mesiSet).sort().reverse();
+                selectMese.innerHTML = '<option value="">-- Seleziona Mese Attivo --</option>';
+                mesiList.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = m;
+                    selectMese.appendChild(opt);
+                });
+                if (mesiList.length === 0) {
+                    selectMese.innerHTML = '<option value="">Nessun mese ordinario attivo</option>';
+                }
+            } catch (e) { console.warn("Errore initMenuOrdinario:", e); }
+        }
+
+        window.onMeseOrdinarioChange = function(e) {
+            const val = e.target.value;
+            if (!val) return;
+            Swal.fire({ title: `Mese ${val} selezionato`, text: 'Seleziona ora una data specifica di questo mese dal calendario accanto.', icon: 'info', timer: 3000 });
+        };
+
+        // ── FUNZIONI MODALITÀ RECUPERO BACKUP (R&D) ───────────────────────────
+        async function caricaMesiRecupero() {
+            const selectMese = document.getElementById('selectMeseRecupero');
+            if (!selectMese) return;
+            selectMese.innerHTML = '<option value="">Caricamento archivio R&D...</option>';
+            try {
+                const fn = httpsCallable(functions, 'recupera_viaggio_storico');
+                const res = await fn({ azione: 'lista_mesi' });
+                if (res.data && res.data.status === 'ok') {
+                    const mesi = res.data.mesi || [];
+                    selectMese.innerHTML = '<option value="">-- Seleziona Mese Storico --</option>';
+                    mesi.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        opt.textContent = m;
+                        selectMese.appendChild(opt);
+                    });
+                    if (mesi.length === 0) selectMese.innerHTML = '<option value="">Nessun backup trovato in ARCHIVIO_STORICO_RD/</option>';
+                } else {
+                    selectMese.innerHTML = `<option value="">Errore: ${res.data?.message}</option>`;
+                }
+            } catch (e) { selectMese.innerHTML = '<option value="">Errore di rete</option>'; }
+        }
+
+        window.onMeseRecuperoChange = async function(e) {
+            const mese = e.target.value;
+            const selectData = document.getElementById('selectDataRecupero');
+            if (!mese || !selectData) return;
+            selectData.innerHTML = '<option value="">Caricamento giornate...</option>';
+            try {
+                const fn = httpsCallable(functions, 'recupera_viaggio_storico');
+                const res = await fn({ azione: 'lista_giornate', mese: mese });
+                if (res.data && res.data.status === 'ok') {
+                    const date = res.data.giornate || [];
+                    selectData.innerHTML = '<option value="">-- Seleziona Giornata --</option>';
+                    date.forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d;
+                        opt.textContent = d;
+                        selectData.appendChild(opt);
+                    });
+                    if (date.length === 0) selectData.innerHTML = '<option value="">Nessuna giornata trovata</option>';
+                } else { selectData.innerHTML = `<option value="">Errore: ${res.data?.message}</option>`; }
+            } catch (e) { selectData.innerHTML = '<option value="">Errore di rete</option>'; }
+        };
+
+        window.eseguiRecuperoStorico = async function() {
+            const mese = document.getElementById('selectMeseRecupero')?.value;
+            const dataTarget = document.getElementById('selectDataRecupero')?.value;
+            if (!mese || !dataTarget) {
+                Swal.fire('Attenzione', 'Seleziona prima un mese e una data d\'interesse.', 'warning');
+                return;
+            }
+            Swal.fire({ title: 'Ripristino Sandbox R&D...', html: `Ripristino del viaggio <b>${dataTarget}</b> in corso...<br>Questo viaggio riceverà il badge ⚠️ VIAGGIO STORICO RECUPERATO e sarà pronto per Genera Tutte le Mappe.`, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const fn = httpsCallable(functions, 'recupera_viaggio_storico');
+                const res = await fn({ azione: 'recupera', mese: mese, data_consegna: dataTarget });
+                if (res.data && res.data.status === 'ok') {
+                    dataLavoro = dataTarget;
+                    localStorage.setItem('locked_date', dataLavoro);
+                    const url = new URL(window.location);
+                    url.searchParams.set('data', dataLavoro);
+                    window.history.pushState({}, '', url);
+                    
+                    if (dataLavoro.includes('-') && dataLavoro.split('-')[0].length === 2) {
+                        document.getElementById('dateSelector').value = dataLavoro.split('-').reverse().join('-');
+                    } else { document.getElementById('dateSelector').value = dataLavoro; }
+
+                    Swal.fire('Viaggio Recuperato!', res.data.message, 'success');
+                    await caricaViaggi();
+                } else { Swal.fire('Errore', res.data?.message || 'Errore sconosciuto', 'error'); }
+            } catch (e) { Swal.fire('Errore di rete', e.message, 'error'); }
+        };
+
+        window.rilasciaRecuperoStorico = async function() {
+            if (!dataLavoro) return;
+            const conf = await Swal.fire({ title: 'Conferma Rilascio', text: `Vuoi concludere lo studio per il ${dataLavoro} ed eliminare istantaneamente i record provvisori di R&D per mantenere pulito il database? (Il backup originale rimarrà intatto in ARCHIVIO_STORICO_RD/)`, icon: 'question', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b', confirmButtonText: 'Sì, rilascia e pulisci', cancelButtonText: 'Annulla', reverseButtons: true });
+            if (!conf.isConfirmed) return;
+
+            Swal.fire({ title: 'Pulizia in corso...', text: `Rilascio e cancellazione dei record provvisori di ${dataLavoro}...`, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const fn = httpsCallable(functions, 'rilascia_recupero_storico');
+                const res = await fn({ data_consegna: dataLavoro });
+                if (res.data && res.data.status === 'ok') {
+                    Swal.fire('Rilasciato!', res.data.message, 'success');
+                    document.getElementById('btnRilasciaRecupero').style.display = 'none';
+                    viaggi = [];
+                    renderViaggi();
+                    document.getElementById('emptyState').style.display = 'block';
+                    document.getElementById('emptyState').innerHTML = `<span class="material-icons-round">verified_user</span><h3>Studio concluso</h3><p>Sessione di studio per il ${dataLavoro} conclusa e database ripulito con successo.</p>`;
+                } else { Swal.fire('Errore', res.data?.message || 'Errore sconosciuto', 'error'); }
+            } catch (e) { Swal.fire('Errore di rete', e.message, 'error'); }
+        };
+
+        // ── GENERA MAPPA (singola) ─────────────────────────────────────────────
+        window.generaMappa = async function(viaggioId) {
+            const btn = document.getElementById(`btn-${viaggioId}`);
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-icons-round spinning">autorenew</span> Generazione...';
+            
+            const v = viaggi.find(x => x.id === viaggioId);
+            const d_url = v ? (v.distinta_light || null) : null;
+
+            try {
+                const fn = httpsCallable(functions, 'genera_mappa_autista', { timeout: 120000 });
+                const res = (await fn({ viaggio_id: viaggioId, distinta_url: d_url, tenant: activeTenant })).data;
+
+                if (res.status === 'errore') throw new Error(res.message);
+
+                const url = res.data.mappa_url;
+                const km  = res.data.km_reali;
+                const min = Math.round((res.data.t_guida_min || 0));
+
+                // Aggiorna la card
+                const v = viaggi.find(x => x.id === viaggioId);
+                if (v) { v.mappa_url = url; v.km_reali = km; v.t_guida_min = min; }
+
+                // Rimpiazza la card con dati aggiornati
+                const old = document.getElementById(`card-${viaggioId}`);
+                const newCard = buildCard({ ...v, mappa_url: url, km_reali: km });
+                old.replaceWith(newCard);
+
+                Swal.fire({ icon: 'success', title: 'Mappa generata!',
+                    html: `<b>${km?.toFixed(1)} km</b> — ${min} min guida<br><a href="${url}" target="_blank">Apri mappa</a>`,
+                    timer: 4000, timerProgressBar: true });
+            } catch (e) {
+                console.error('[BAT5]', e);
+                Swal.fire('Errore', e.message || 'Errore Cloud Function', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-icons-round">directions_car</span> GENERA MAPPA';
+            }
+        };
+
+        // ── GENERA TUTTE ──────────────────────────────────────────────────────
+        window.generaTutteMappe = async function() {
+            const btn1 = document.getElementById('btnGeneraTutte');
+            const btn2 = document.getElementById('btnGeneraTutteRecupero');
+            if (btn1) btn1.disabled = true;
+            if (btn2) btn2.disabled = true;
+            const tot = viaggi.length;
+            let done = 0, errors = 0;
+
+            Swal.fire({ title: `Generazione mappe (0/${tot})`,
+                html: 'In corso...<br><small>Attendi il completamento di tutte le zone.</small>',
+                allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            for (const v of viaggi) {
+                const pts = v.punti_ottimizzati || v.punti || [];
+                if (pts.length === 0) {
+                    console.log(`[BAT5 batch] Skip viaggio vuoto: ${v.id}`);
+                    continue;
+                }
+                try {
+                    const fn = httpsCallable(functions, 'genera_mappa_autista', { timeout: 120000 });
+                    const res = (await fn({ viaggio_id: v.id, distinta_url: (v.distinta_light || null), tenant: activeTenant })).data;
+                    if (res.status === 'errore') throw new Error(res.message);
+                    v.mappa_url = res.data.mappa_url;
+                    v.km_reali  = res.data.km_reali;
+                    done++;
+                } catch (e) {
+                    console.error(`[BAT5 batch] ${v.id}:`, e);
+                    errors++;
+                }
+                Swal.update({ title: `Generazione mappe (${done+errors}/${tot})` });
+            }
+
+            renderViaggi();
+            if (btn1) btn1.disabled = false;
+            if (btn2) btn2.disabled = false;
+
+            const msg = errors
+                ? `${done} ok, ${errors} errori — vedi console`
+                : `Tutte le ${done} mappe generate con successo!`;
+            Swal.fire(errors ? 'Completato con avvisi' : '✅ Completato', msg, errors ? 'warning' : 'success');
+        };
+
+        // ── COPIA LINK ────────────────────────────────────────────────────────
+        window.copiaLink = async function(viaggioId, url) {
+            try {
+                await navigator.clipboard.writeText(url);
+                const btn = document.getElementById(`copia-${viaggioId}`);
+                btn.classList.add('copied');
+                btn.innerHTML = '<span class="material-icons-round" style="font-size:16px;">check</span> Copiato!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = '<span class="material-icons-round" style="font-size:16px;">content_copy</span> Copia link';
+                }, 2000);
+            } catch { Swal.fire('Errore', 'Impossibile copiare negli appunti', 'error'); }
+        };
+
+        function showError(msg) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'block';
+            document.getElementById('errorMsg').textContent = msg;
+        }
+    </script>
+</body>
+</html>
+

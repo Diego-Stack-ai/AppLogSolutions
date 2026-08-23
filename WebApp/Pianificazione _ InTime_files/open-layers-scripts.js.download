@@ -1,0 +1,231 @@
+OpenLayers.Control.Click = OpenLayers.Class(OpenLayers.Control, {
+	defaultHandlerOptions: {
+		'single': true,
+		'double': false,
+		'pixelTolerance': 0,
+		'stopSingle': false,
+		'stopDouble': false
+	},
+
+	initialize: function(options) {
+		this.handlerOptions = OpenLayers.Util.extend({},
+			this.defaultHandlerOptions);
+		OpenLayers.Control.prototype.initialize.apply(this, arguments);
+		this.handler = new OpenLayers.Handler.Click(this, {
+			'click': this.trigger
+		}, this.handlerOptions);
+	},
+
+	trigger: function(e) {
+		var lonlat = map.getLonLatFromPixel(e.xy).transform(
+			new OpenLayers.Projection("EPSG:900913"),
+			new OpenLayers.Projection("EPSG:4326"));
+
+		var inputs = document.getElementsByTagName("input");
+		for (var i = 0; i < inputs.length; i++) {
+			if (endsWith(inputs[i].name, "newLat")) {
+				inputs[i].value = lonlat.lat;
+			}
+		}
+		for (var i = 0; i < inputs.length; i++) {
+			if (endsWith(inputs[i].name, "newLon")) {
+				inputs[i].value = lonlat.lon;
+			}
+		}
+	}
+});
+
+var map;
+var markers;
+var layer;
+var currentPopup;
+var vectors;
+
+var decodeEntities = (function() {
+	// this prevents any overhead from creating the object each time
+	var element = document.createElement('div');
+
+	function decodeHTMLEntities(str) {
+		if (str && typeof str === 'string') {
+			// strip script/html tags
+			str = str.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, '');
+			str = str.replace(/<\/?\w(?:[^"'>]|"[^"]*"|'[^']*')*>/gmi, '');
+			element.innerHTML = str;
+			str = element.textContent;
+			element.textContent = '';
+		}
+		return str;
+	}
+	return decodeHTMLEntities;
+})();
+
+function addMarker(ll, popupClass, popupContentHTML, closeBox, overflow, icon,
+	pvId, index, rowId) {
+	var point = new OpenLayers.Geometry.Point(ll.lon, ll.lat);
+	var feature = new OpenLayers.Feature.Vector(
+		point,
+		null,
+		{
+			externalGraphic: 'http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld='
+				+ index + '|FF0000|000000',
+			// externalGraphic : icon,
+			graphicWidth: 21,
+			graphicHeight: 34,
+			fillOpacity: 1
+		});
+	// var feature = new OpenLayers.Feature.Vector(point, null);
+	feature.fid = rowId;
+	markers.addFeatures([feature]);
+}
+function clickSulMarkerSimple(id, code) {
+	var inputs = document.getElementsByTagName("input");
+	for (var i = 0; i < inputs.length; i++) {
+		if (endsWith(inputs[i].name, "textSelectedPlant")) {
+			inputs[i].value = id + ":" + code;
+		}
+	}
+	for (var i = 0; i < inputs.length; i++) {
+		if (endsWith(inputs[i].name, "hiddenButton")) {
+			inputs[i].click();
+		}
+	}
+}
+
+function endsWith(str, suffix) {
+	return str.indexOf(suffix, str.length - suffix.length) !== -1;
+}
+
+function onPlantSelect(event) {
+	var txtField = document
+		.getElementById("response-detail-form:markerIdHiddenInput");
+	txtField.value = event.feature.fid;
+	selectTruckFromMarker();
+}
+
+function onPlantUnselect(event) {
+	var feature = event.feature;
+	if (feature.popup) {
+		map.removePopup(feature.popup);
+		feature.popup.destroy();
+		delete feature.popup;
+	}
+}
+
+function initItineraryMap(markerCoordinates) {
+
+	clusterStrategy = new OpenLayers.Strategy.Cluster();
+	map = new OpenLayers.Map('itineraryMapDiv');
+	layerOSM = new OpenLayers.Layer.OSM("Open Street Maps");
+	// layerGoogle = new OpenLayers.Layer.Google("Google Maps", {
+	// zoomMethod : null,
+	// animationEnabled : false
+	// });
+	var lon = 12.469;
+	var lat = 41.894;
+	map.addLayer(layerOSM);
+	// map.addLayer(layerGoogle);
+	map.setCenter(new OpenLayers.LonLat(lon, lat).transform(
+		new OpenLayers.Projection("EPSG:3857"), map.getProjectionObject()),
+		6);
+	markers = new OpenLayers.Layer.Vector("Visite", {
+		strategies: [],
+	});
+	map.addLayers([layerOSM, markers]);
+	selectControl = new OpenLayers.Control.SelectFeature([markers], {
+		clickout: true,
+		toggle: false,
+		multiple: false,
+		hover: false,
+		toggleKey: "ctrlKey",
+		multipleKey: "shiftKey"
+	});
+	markers.events.on({
+		"featureselected": onPlantSelect,
+		"featureunselected": onPlantUnselect
+	});
+	map.addControl(selectControl);
+	selectControl.activate();
+
+	if (markerCoordinates == "") {
+		return;
+	}
+	var markersDetail = JSON.parse(markerCoordinates);
+	// var popupClass = OpenLayers.Class(OpenLayers.Popup.FramedCloud, {
+	// 'autoSize' : true
+	// });
+	for (var index = 0; index < markersDetail.length; index++) {
+		var md = markersDetail[index];
+		var ll = new OpenLayers.LonLat(md.lon, md.lat).transform(
+			new OpenLayers.Projection("EPSG:4326"), map
+				.getProjectionObject());
+		addMarker(ll, null, null, true, false, md.icon, md.id, md.index,
+			md.rowId);
+	}
+	// map.addControl(new OpenLayers.Control.LayerSwitcher());
+	var bounds = markers.getDataExtent();
+	map.zoomToExtent(bounds);
+}
+
+function bodyOnloadFunction() {
+	try {
+		initMapCommand();
+	} catch (e) {
+	}
+	try {
+		loadMonitoringMapRC();
+	} catch (e) {
+	}
+	try {
+		//		PF('sumRowsTable').filter();
+	} catch (e) {
+	}
+	try {
+		displayTripSavedMessage();
+	} catch (e) {
+	}
+}
+
+function displayMap() {
+	try {
+		displayMapRC();
+	} catch (e) {
+	}
+}
+
+function handleKeyPress(e) {
+	if (e.keyCode == 13) {
+		calculateCorrectiveFactors();
+		return false;
+	}
+}
+
+function handleKeyPressAmountConfirmTravels(e) {
+	if (e.keyCode == 13) {
+		calculateAmountCurierTravels();
+		return false;
+	}
+}
+
+function handleKeyPressAdditionalCostsConfirmTravels(e) {
+	if (e.keyCode == 13) {
+		calculateAdditionalCostsCurierTravels();
+		return false;
+	}
+}
+
+function handleKeyPressCalculateQuantities(e) {
+	if (e.keyCode == 13) {
+		calculateQuantities();
+		return false;
+	}
+}
+
+function changeSummaryCostTableScrollableWidth() {
+	document.getElementById("summary-costs:hidden-scroll-col-width").value = document.body.offsetWidth - 212;
+	updateSummaryCostTable();
+}
+
+function changeSummaryCostTableScrollableHeight() {
+	document.getElementById("summary-costs:hidden-scroll-col-height").value = document.body.offsetHeight - 50;
+	updateSummaryCostTable();
+}

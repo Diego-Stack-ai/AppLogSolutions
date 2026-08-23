@@ -1,7 +1,0 @@
-2026/07/24-15:45:18.683 6f3c Creating DB G:\Il mio Drive\App\AppLogSolutionsWeb\e2e-tests\.playwright_pwa_profile\Default\IndexedDB\https_log-solutions-sviluppo.web.app_0.indexeddb.leveldb since it was missing.
-2026/07/24-15:45:19.578 6f3c Reusing MANIFEST G:\Il mio Drive\App\AppLogSolutionsWeb\e2e-tests\.playwright_pwa_profile\Default\IndexedDB\https_log-solutions-sviluppo.web.app_0.indexeddb.leveldb/MANIFEST-000001
-2026/07/24-15:45:19.956 82d8 Level-0 table #5: started
-2026/07/24-15:45:20.176 82d8 Level-0 table #5: 1348 bytes OK
-2026/07/24-15:45:20.200 82d8 Delete type=0 #3
-2026/07/24-15:45:20.249 2fc0 Manual compaction at level-0 from '\x00\x01\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x02\x00\x00\x00' @ 0 : 0; will stop at (end)
-2026/07/24-15:45:33.505 7af0 Manual compaction at level-0 from '\x00\x04\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x05\x00\x00\x00' @ 0 : 0; will stop at (end)
