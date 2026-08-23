@@ -452,49 +452,13 @@ I concetti di **bump versione**, **commit**, **push** e **deploy** sono **QUATTR
 
 ## 12. DEPLOY SELETTIVO DEV
 
-Il deploy completo `firebase deploy --project log-solutions-cantiere` è classificato come **OPERAZIONE ECCEZIONALE AD ALTO RISCHIO**.
+Il deploy completo `firebase deploy come **OPERAZIONE ECCEZIONALE AD ALTO RISCHIO**.
 
 La procedura standard per lo sviluppo utilizza **esclusivamente deploy selettivi**:
 
 ```bash
 # Frontend Sviluppo
-firebase deploy --only hosting --project log-solutions-cantiere
-
-# Backend Cloud Functions Sviluppo
-firebase deploy --only functions --project log-solutions-cantiere
-
-# Firestore Rules Sviluppo
-firebase deploy --only firestore:rules --project log-solutions-cantiere
-
-# Storage Rules Sviluppo
-firebase deploy --only storage --project log-solutions-cantiere
-```
-
----
-
-## 13. DEPLOY SELETTIVO PRODUZIONE
-
-La produzione non deve MAI essere aggiornata automaticamente. La procedura standard per la Produzione utilizza **esclusivamente deploy selettivi**:
-
-```bash
-# Frontend Produzione
-firebase deploy --only hosting --project log-solution-60007
-
-# Backend Cloud Functions Produzione
-firebase deploy --only functions --project log-solution-60007
-
-# Firestore Rules Produzione
-firebase deploy --only firestore:rules --project log-solution-60007
-
-# Storage Rules Produzione
-firebase deploy --only storage --project log-solution-60007
-```
-
----
-
-## 14. FIREBASE E TARGET ESPLICITI
-
-Ogni comando Firebase CLI DEVE contenere il flag esplicito `--project <PROJECT_ID>`.
+firebase deploy --only hosting Firebase CLI DEVE contenere il flag esplicito `--project <PROJECT_ID>`.
 
 ```text
 OPERAZIONE ECCEZIONALE AD ALTO RISCHIO: Deploy Completo
@@ -504,15 +468,7 @@ Il comando `firebase deploy --project <PROJECT_ID>` senza `--only` è consentito
 
 ```text
 Riconfigurazione Motore Cloud Functions:
-firebase deploy --only functions --project log-solutions-cantiere
-firebase deploy --only functions --project log-solution-60007
-```
-
----
-
-## 15. SCRIPT CON ACCESSO ALLA PRODUZIONE
-
-Durante qualsiasi lavoro sull'ambiente di Cantiere è **TASSATIVAMENTE VIETATO** eseguire:
+firebase deploy --only functions sull'ambiente di Cantiere è **TASSATIVAMENTE VIETATO** eseguire:
 * Script che caricano `prod_key.json`;
 * Script che inizializzano Sviluppo e Produzione contemporaneamente;
 * Script di sincronizzazione (`sincronizza_sviluppo.py`, `sincronizza_totale.py`, `sincronizza_cache_distanze.py`);

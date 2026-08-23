@@ -33,18 +33,13 @@ Ogni volta che vengono apportate modifiche, sia al frontend che al backend (nuov
 - **TASSATIVO — DEPLOY CI/CD:** Dopo la modifica, NON lanciare `firebase deploy --only hosting` manualmente dal terminale locale per la produzione. L'Hosting viene deployato in automatico tramite GitHub Actions dal branch `main`.
 
 ### Sequenza Operativa del Deploy:
-1. Assicurarsi di trovarsi sul branch di lavoro (es. `cantiere`).
+1. Assicurarsi di trovarsi sul branch `main`.
 2. Scrivere il codice e apportare le modifiche necessarie.
 3. Eseguire il bump della versione per forzare il refresh della cache:
    ```bash
    python bump_version.py
    ```
-4. **Deploy in Cantiere (Senza Commit):** L'agente o l'utente lancia il deploy manuale sull'ambiente di test:
-   ```bash
-   firebase deploy --only hosting --project log-solutions-cantiere
-   ```
-5. **COLLAUDO UMANO:** L'agente si ferma. L'utente apre l'app di cantiere, testa le modifiche e valuta se tutto funziona correttamente.
-6. **Commit e Push in Produzione:** Solo DOPO che l'utente ha confermato il collaudo superato, l'agente è autorizzato a:
+4. **Commit e Push in Produzione:** L'agente è autorizzato a:
    - Fare `git add .` e `git commit -m "..."`
    - Fare il merge su `main` e `git push`.
    - A questo punto i server GitHub si arrangeranno in automatico a fare il deploy in produzione.
@@ -73,21 +68,17 @@ Ogni volta che vengono apportate modifiche, sia al frontend che al backend (nuov
 
 ---
 
-## Regole sul Deploy (CI/CD Obbligatorio) e ISOLAMENTO AMBIENTI
+## Regole sul Deploy (CI/CD Obbligatorio) 
 
-- **TASSATIVO â€” ISOLAMENTO TOTALE E DEFINITIVO DEI DUE MONDI (PRODUZIONE vs CANTIERE):**
+- **TASSATIVO — AMBIENTE DI PRODUZIONE UNICO:**
   - **PRODUZIONE (`main`):** Qualsiasi operazione di deploy ufficiale (sia Hosting automatico via GitHub che Functions manuali) deve puntare unicamente al progetto `log-solution-60007`.
-  - **SVILUPPO (`sviluppo`):** Quando si lavora sul branch `sviluppo`, QUALSIASI operazione di deploy manuale (Hosting o Cloud Functions) DEVE essere indirizzata esclusivamente al progetto di sviluppo (`log-solutions-cantiere`) aggiungendo il flag `--project log-solutions-cantiere`. Ãˆ severamente vietato caricare codice in fase di test sul server di produzione.
 - TASSATIVO â€” DIVIETO SUL MULETTO: Il progetto e ambiente muletto (`log-solution-muletto`) NON DEVE MAI ESSERE TOCCATO o UTILIZZATO.
-- **TASSATIVO â€” STOP PER COLLAUDO UTENTE SULL'APP:** Dopo aver completato la scrittura del codice sul branch `sviluppo` e aver fatto il commit, l'agente DEVE TASSATIVAMENTE FERMARSI e invitare l'operatore umano a testare l'applicazione dal vivo nel proprio ambiente locale/browser. Ãˆ severamente vietato eseguire il merge su `main` e il push per la CI/CD fino a quando l'utente non rilascerÃ  l'esplicita autorizzazione: "Collaudo superato, procedi al deploy sul main".
-- **HOSTING (FRONTEND):** Tassativamente VIETATO fare `firebase deploy --only hosting` verso la produzione manualmente dal terminale locale. Il deploy in produzione avviene IN AUTOMATICO tramite GitHub Actions quando si effettua il `git push origin main`. L'agente deve limitarsi a unire le modifiche su `main` e fare il push. Per l'Hosting dell'ambiente di Cantiere, Ã¨ consentito l'uso di `firebase deploy --only hosting --project log-solutions-cantiere`.
-- **FUNCTIONS (BACKEND):** Il deploy delle Cloud Functions si esegue dal terminale locale, ma **TASSATIVAMENTE** specificando sempre il progetto di destinazione: `--project log-solutions-cantiere` (per i test) o `--project log-solution-60007` (per l'ufficiale, solo dopo approvazione).
+- **HOSTING (FRONTEND):** Tassativamente VIETATO fare `firebase deploy --only hosting` verso la produzione manualmente dal terminale locale. Il deploy in produzione avviene IN AUTOMATICO tramite GitHub Actions quando si effettua il `git push origin main`. L'agente deve limitarsi a unire le modifiche su `main` e fare il push. 
+- **FUNCTIONS (BACKEND):** Il deploy delle Cloud Functions si esegue dal terminale locale, ma **TASSATIVAMENTE** specificando sempre il progetto di destinazione: ``--project log-solution-60007` (per l'ufficiale, solo dopo approvazione).
 - Una sola funzione: `firebase deploy --only functions:nome_funzione --project [NOME_PROGETTO]` (eseguire sempre dalla cartella G:\Il mio Drive\App\AppLogSolutionsWeb).
 - NON eseguire mai `firebase deploy` totale senza `--only`.
-- **GESTIONE VERSIONI (BUMP):** Prima di qualsiasi deploy (sia manuale verso cantiere, sia push verso GitHub per la produzione), è **TASSATIVO** eseguire lo script `python bump_version.py` dalla cartella **radice** `G:\Il mio Drive\App\AppLogSolutionsWeb` (NON dentro frontend/). Lo script legge la versione da script.js, la incrementa, aggiorna sw.js, script.js e tutti i file HTML con fallback encoding cp1252 per i file non-UTF8.
-- **COMUNICAZIONE ALL'UTENTE:** Al termine di un deploy manuale o di un bump, l'agente DEVE dichiarare in modo cristallino all'utente su quale ambiente ha operato (Cantiere vs Produzione) e quale versione esatta ha calcolato lo script, ricordando all'utente di fare un refresh forzato (`Ctrl + F5`) se la cache del browser dovesse mostrare ancora il vecchio numero.
-- **SINCRONIZZAZIONE DATI:** Prima di validare modifiche critiche in cantiere, usare lo script `sincronizza_dati_freschi.py` per copiare database e cache delle distanze dalla Produzione al Cantiere, assicurando test realistici su dati attuali.
-
+- **GESTIONE VERSIONI (BUMP):** Prima di qualsiasi deploy (prima di ogni push verso GitHub per la produzione), è **TASSATIVO** eseguire lo script `python bump_version.py` dalla cartella **radice** `G:\Il mio Drive\App\AppLogSolutionsWeb` (NON dentro frontend/). Lo script legge la versione da script.js, la incrementa, aggiorna sw.js, script.js e tutti i file HTML con fallback encoding cp1252 per i file non-UTF8.
+- **COMUNICAZIONE ALL'UTENTE:** Al termine di un deploy manuale o di un bump, l'agente DEVE dichiarare in modo cristallino all'utente su quale ambiente ha operato (Produzione) e quale versione esatta ha calcolato lo script, ricordando all'utente di fare un refresh forzato (`Ctrl + F5`) se la cache del browser dovesse mostrare ancora il vecchio numero.
 ---
 
 ## Filiera di Controllo Prima di Modificare
