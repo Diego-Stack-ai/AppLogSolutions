@@ -16,7 +16,7 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 
-    <link rel="stylesheet" href="styles.css?v=6.408">
+    <link rel="stylesheet" href="styles.css?v=6.410">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <style>
         .navetta-details-row {
@@ -587,13 +587,13 @@ tr.weekend:hover
         </div>
     </main>
 
-    <script src="script.js?v=6.408"></script>
-    <script type="module" src="firebase-auth-sync.js?v=6.408"></script>
+    <script src="script.js?v=6.410"></script>
+    <script type="module" src="firebase-auth-sync.js?v=6.410"></script>
     <script type="module">
         import { db, app } from "./core/firebase-init.js";
         import { getFirestore, collection, doc, setDoc, query, where, onSnapshot, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { firebaseConfig } from "./firebase-config.js";
-        import { calculateHours } from "./firestore-service.js?v=6.408";
+        import { calculateHours } from "./firestore-service.js?v=6.410";
 
           window.db = getFirestore(app);
 
@@ -1907,7 +1907,7 @@ tr.weekend:hover
             // Controllo Connessione
             let isOnline = true;
             try {
-                const { connectivityService } = await import("./core/connectivity-service.js?v=6.408");
+                const { connectivityService } = await import("./core/connectivity-service.js?v=6.410");
                 isOnline = connectivityService.getStatus() === 'online';
             } catch (e) {}
 
@@ -1975,7 +1975,7 @@ tr.weekend:hover
                 // Accoda le foto offline
                 if (window.offlinePresenzePhotoBlobs && Object.keys(window.offlinePresenzePhotoBlobs).length > 0) {
                     try {
-                        const { syncManager } = await import("./core/sync-manager.js?v=6.408");
+                        const { syncManager } = await import("./core/sync-manager.js?v=6.410");
                         for (const index in window.offlinePresenzePhotoBlobs) {
                             const fileBlob = window.offlinePresenzePhotoBlobs[index];
                             const photoId = `foto_presenza_${docId}_${index}`;
@@ -2741,7 +2741,7 @@ tr.weekend:hover
             </div>
         </div>
     </div>
-    <script type="module" src="cedolini-splitter.js?v=6.408"></script>
+    <script type="module" src="cedolini-splitter.js?v=6.410"></script>
 
 </body>
 </html>

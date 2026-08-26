@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visualizzazione Dati - Log Solution</title>
-    <link rel="stylesheet" href="styles.css?v=6.408">
+    <link rel="stylesheet" href="styles.css?v=6.410">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
     <!-- PWA & Mobile Optimization -->
@@ -237,13 +237,13 @@
     </main>
 
         <!-- Script base: inizializza window.appData -->
-    <script src="script.js?v=6.408"></script>
+    <script src="script.js?v=6.410"></script>
     <!-- Autenticazione Firebase: popola currentUser e chiama onUserProfileLoaded -->
-    <script type="module" src="firebase-auth-sync.js?v=6.408"></script>
+    <script type="module" src="firebase-auth-sync.js?v=6.410"></script>
 
     <script type="module">
-        import { getAllTrips, getTripLogs, deleteTrip } from "./firestore-service.js?v=6.408";
-        import { renderTripList, removeTripCard } from "./ui-render.js?v=6.408";
+        import { getAllTrips, getTripLogs, deleteTrip } from "./firestore-service.js?v=6.410";
+        import { renderTripList, removeTripCard } from "./ui-render.js?v=6.410";
 
         const filterAutista = document.getElementById('filterAutista');
         const btnRefresh = document.getElementById('btnRefresh');
